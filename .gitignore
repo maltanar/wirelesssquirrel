@@ -1,0 +1,10 @@
+Debug
+Release
+*.wsdt
+*.dep
+*.pdb
+*.pbi
+*.map
+Obj
+settings
+*.pdf
