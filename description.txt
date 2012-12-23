@@ -1,0 +1,8 @@
+Energy-efficient presence detection. (How many squirrels 
+are the in the wood?)
+Design and implement an identifier algorithm to identify sensors 
+in a network using visible sensors to relay information. Battery 
+life and response time are key performance indicators. 
+Simulation of N sensors, practical implementation of 3-4 on 
+IEEE802.15.4 devices. Compare with what may be possible 
+with Bluetooth LE (Smart Energy).
