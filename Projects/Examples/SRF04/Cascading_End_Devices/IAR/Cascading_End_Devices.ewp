@@ -1297,10 +1297,10 @@
         </option>
         <option>
           <name>CCDefines</name>
-          <state>MCU_H=&lt;ioCC2430.h></state>
-          <state>MRFI_CC2430</state>
-          <state>xMCU_H=&lt;ioCC2431.h></state>
-          <state>xMRFI_CC2431</state>
+          <state>xMCU_H=&lt;ioCC2430.h></state>
+          <state>xMRFI_CC2430</state>
+          <state>MCU_H=&lt;ioCC2431.h></state>
+          <state>MRFI_CC2431</state>
         </option>
         <option>
           <name>CCPreprocFile</name>
