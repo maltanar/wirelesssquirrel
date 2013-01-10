@@ -80,25 +80,19 @@ void main (void)
    * we supply a callback pointer to handle the message returned by the peer.
    */
   SMPL_Init(0);
-
-  /* turn on LEDs. */
-  if (!BSP_LED2_IS_ON())
-  {
-    toggleLED(2);
-  }
-  if (!BSP_LED1_IS_ON())
-  {
-    toggleLED(1);
-  }
+  
+  BSP_TURN_ON_LED1();
 
   /* wait for a button press... */
   do {
     FHSS_ACTIVE( nwk_pllBackgrounder( false ) ); /* manage FHSS */
-    if (BSP_BUTTON1() || BSP_BUTTON2())
+    if (BSP_BUTTON1())
     {
       break;
     }
   } while (1);
+  
+  BSP_TURN_OFF_LED1();
 
   /* never coming back... */
   monitorForBadNews();
@@ -111,11 +105,6 @@ static void monitorForBadNews()
 {
   uint8_t i, msg[1], len;
 
-  /* Turn off LEDs. Check for bad news will toggle one LED. 
-   * The other LED will toggle when bad news message is sent.
-   */
-  toggleLED(2);
-  toggleLED(1);
 
   /* frequency hopping doesn't support sleeping just yet */
 #ifndef FREQUENCY_HOPPING
@@ -131,9 +120,8 @@ static void monitorForBadNews()
       SPIN_ABOUT_A_SECOND; /* manages FHSS implicitly */
     }
 
-    toggleLED(1);
     /* check "sensor" to see if we need to send an alert */
-    if (BSP_BUTTON1() || BSP_BUTTON2())
+    if (BSP_BUTTON1())
     {
       /* sensor activated. start babbling. */
       start2Babble();
@@ -208,6 +196,6 @@ static void start2Babble()
     NWK_DELAY(100);
     /* babble... */
     SMPL_Send(SMPL_LINKID_USER_UUD, msg, sizeof(msg));
-    toggleLED(2);
+    BSP_TOGGLE_LED1();
   }
 }
