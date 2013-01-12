@@ -41,7 +41,7 @@
 #include "bsp_buttons.h"
 #include "nwk.h"
 #include "nwk_pll.h"
-
+#include "stdio.h"
 static void monitorForBadNews(void);
 
 void toggleLED(uint8_t);
@@ -57,35 +57,30 @@ static void start2Babble(void);
 #define BAD_NEWS   (1)
 #define CHECK_RATE (5)
 
+#define UNIQUE_ID 0x01
+
 void main (void)
 {
   BSP_Init();
 
-  /* If an on-the-fly device address is generated it must be done before the
-   * call to SMPL_Init(). If the address is set here the ROM value will not 
-   * be used. If SMPL_Init() runs before this IOCTL is used the IOCTL call 
-   * will not take effect. One shot only. The IOCTL call below is conformal.
-   */
-#ifdef I_WANT_TO_CHANGE_DEFAULT_ROM_DEVICE_ADDRESS_PSEUDO_CODE
-  {
-    addr_t lAddr;
-
-    createRandomAddress(&lAddr);
-    SMPL_Ioctl(IOCTL_OBJ_ADDR, IOCTL_ACT_SET, &lAddr);
-  }
-#endif /* I_WANT_TO_CHANGE_DEFAULT_ROM_DEVICE_ADDRESS_PSEUDO_CODE */
-
+  /* Assign a unique address to the radio device, based on the the unique NW id.
+   * The first three bytes can be selected arbitrarlily */
+  addr_t lAddr = {{0x71, 0x56, 0x34, UNIQUE_ID}};
+  SMPL_Ioctl(IOCTL_OBJ_ADDR, IOCTL_ACT_SET, &lAddr);
+	
   /* This call will fail because the join will fail since there is no Access Point
    * in this scenario. but we don't care -- just use the default link token later.
    * we supply a callback pointer to handle the message returned by the peer.
    */
   SMPL_Init(0);
+  addr_t rAddr;
+  SMPL_Ioctl(IOCTL_OBJ_ADDR, IOCTL_ACT_GET, &rAddr);
+  printf("Address: %02x, %02x, %02x, %02x \n", rAddr.addr[0], rAddr.addr[1], rAddr.addr[2], rAddr.addr[3]);
   
   BSP_TURN_ON_LED1();
 
   /* wait for a button press... */
   do {
-    FHSS_ACTIVE( nwk_pllBackgrounder( false ) ); /* manage FHSS */
     if (BSP_BUTTON1())
     {
       break;
@@ -105,19 +100,15 @@ static void monitorForBadNews()
 {
   uint8_t i, msg[1], len;
 
-
-  /* frequency hopping doesn't support sleeping just yet */
-#ifndef FREQUENCY_HOPPING
   /* start the radio off sleeping */
   SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
-#endif
 
   while (1)
   {
     /* spoof MCU sleeping... */
     for (i=0; i<CHECK_RATE; ++i)
     {
-      SPIN_ABOUT_A_SECOND; /* manages FHSS implicitly */
+      SPIN_ABOUT_A_SECOND;
     }
 
     /* check "sensor" to see if we need to send an alert */
@@ -127,22 +118,16 @@ static void monitorForBadNews()
       start2Babble();
     }
 
-    /* frequency hopping doesn't support sleeping just yet */
-#ifndef FREQUENCY_HOPPING
     /* wake up radio. we need it to listen for others babbling. */
     SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
     /* turn on RX. default is RX off. */
     SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
-#endif
 
     /* stay on "long enough" to see if someone else is babbling */
     SPIN_ABOUT_A_QUARTER_SECOND;
 
-    /* frequency hopping doesn't support sleeping just yet */
-#ifndef FREQUENCY_HOPPING
     /* we're done with radio. shut it down */
     SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
-#endif
 
     /* got message? */
     if (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, msg, &len))
@@ -177,12 +162,9 @@ void toggleLED(uint8_t which)
 static void start2Babble()
 {
   uint8_t msg[1];
-
-    /* frequency hopping doesn't support sleeping just yet */
-#ifndef FREQUENCY_HOPPING
+  
   /* wake up radio. */
   SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
-#endif
 
   /* Send the bad news message. To prevent confusion with different "networks"
    * such as neighboring smoke alarm arrays send a token controlled by a DIP 
@@ -191,7 +173,6 @@ static void start2Babble()
   msg[0] = BAD_NEWS;
   while (1)
   {
-    FHSS_ACTIVE( nwk_pllBackgrounder( false ) ); /* manage FHSS */
     /*wait "a while" */
     NWK_DELAY(100);
     /* babble... */
