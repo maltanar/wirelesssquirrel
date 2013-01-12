@@ -42,10 +42,23 @@
 #include "nwk.h"
 #include "nwk_pll.h"
 #include "stdio.h"
-static void monitorForBadNews(void);
+#include "string.h"
 
-void toggleLED(uint8_t);
-static void start2Babble(void);
+/* the message type is used in the first byte of every message to define what kind
+ * of data is carried by the message */
+typedef enum msg_type
+{
+	msg_sync = 0x01,
+	msg_count = 0x05
+}msg_type;
+
+/* to be able to use bit operations we have to use integers to represent the bitfield.
+ * The devices are capable of tranmitting up to 10bytes in one transmission. As the first
+ * byte of every message is used to define the message type, we can count up to 
+ * 32+32+8 = 72 nodes with this basic scheme. It is easily extendable by adding
+ * msg_count_2 message type, that carries another 72 nodes and so on */ 
+static uint32_t bitfield_1;
+static uint8_t buffer[MAX_APP_PAYLOAD];
 
 /* For FHSS systems, calls to NWK_DELAY() will also call nwk_pllBackgrounder()
  * during the delay time so if you use the system delay mechanism in a loop,
@@ -54,129 +67,138 @@ static void start2Babble(void);
 #define SPIN_ABOUT_A_SECOND           NWK_DELAY(1000)
 #define SPIN_ABOUT_A_QUARTER_SECOND   NWK_DELAY(250)
 
-#define BAD_NEWS   (1)
 #define CHECK_RATE (5)
 
 #define UNIQUE_ID 0x01
 
-void main (void)
+static void countingAlgorithm(void);
+static void broadcast(void);
+static void listen(void);
+static void printBitfield(const uint32_t* bf);
+
+void printBitfield(const uint32_t *bf)
 {
-  BSP_Init();
-
-  /* Assign a unique address to the radio device, based on the the unique NW id.
-   * The first three bytes can be selected arbitrarlily */
-  addr_t lAddr = {{0x71, 0x56, 0x34, UNIQUE_ID}};
-  SMPL_Ioctl(IOCTL_OBJ_ADDR, IOCTL_ACT_SET, &lAddr);
-	
-  /* This call will fail because the join will fail since there is no Access Point
-   * in this scenario. but we don't care -- just use the default link token later.
-   * we supply a callback pointer to handle the message returned by the peer.
-   */
-  SMPL_Init(0);
-  addr_t rAddr;
-  SMPL_Ioctl(IOCTL_OBJ_ADDR, IOCTL_ACT_GET, &rAddr);
-  printf("Address: %02x, %02x, %02x, %02x \n", rAddr.addr[0], rAddr.addr[1], rAddr.addr[2], rAddr.addr[3]);
-  
-  BSP_TURN_ON_LED1();
-
-  /* wait for a button press... */
-  do {
-    if (BSP_BUTTON1())
-    {
-      break;
-    }
-  } while (1);
-  
-  BSP_TURN_OFF_LED1();
-
-  /* never coming back... */
-  monitorForBadNews();
-
-  /* but in case we do... */
-  while (1) ;
+	printf("bf: ");
+	for (uint8_t i = 0; i < sizeof(uint32_t) ; i++)
+	{
+		printf("%d", (*bf & 1<<i)? 1:0);
+	}
+	printf("\n");
 }
 
-static void monitorForBadNews()
+void main (void)
 {
-  uint8_t i, msg[1], len;
+	BSP_Init();
+	
+	/* Assign a unique address to the radio device, based on the the unique NW id.
+	* The first three bytes can be selected arbitrarlily */
+	addr_t lAddr = {{0x71, 0x56, 0x34, UNIQUE_ID}};
+	SMPL_Ioctl(IOCTL_OBJ_ADDR, IOCTL_ACT_SET, &lAddr);
+	
+	/* This call will fail because the join will fail since there is no Access Point
+	* in this scenario. but we don't care -- just use the default link token later.
+	* we supply a callback pointer to handle the message returned by the peer.
+	*/
+	SMPL_Init(0);
+	
+	BSP_TURN_ON_LED1();
+	
+	/* wait for a button press... */
+	do {
+		if (BSP_BUTTON1())
+		{
+			break;
+		}
+	} while (1);
+	
+	BSP_TURN_OFF_LED1();
+	
+	/* never coming back... */
+	countingAlgorithm();
+	
+	/* but in case we do... */
+	while (1) ;
+}
 
-  /* start the radio off sleeping */
-  SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+static void countingAlgorithm()
+{
+	uint8_t i;
+	
+	/* start the radio off sleeping */
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+	
+	while (1)
+	{
+		/* spoof MCU sleeping... */
+		BSP_TURN_ON_LED1();
+		for (i=0; i<CHECK_RATE; ++i)
+		{
+			SPIN_ABOUT_A_SECOND;
+		}
+		BSP_TURN_OFF_LED1();
+		
+		/* enter listen mode if button is pressed */
+		if (BSP_BUTTON1())
+		{
+			listen();
+		}
+		/* broadcast unique ID */
+		broadcast();
+	}
+}
 
-  while (1)
-  {
-    /* spoof MCU sleeping... */
-    for (i=0; i<CHECK_RATE; ++i)
-    {
-      SPIN_ABOUT_A_SECOND;
-    }
+static void broadcast()
+{
+	/* wake up radio. */
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
+	
+	/* set the own bit in the bitfield */
+	bitfield_1 |= 1 << UNIQUE_ID;
+	
+	/* copy the current bitfield into the transmit buffer */
+	memset(buffer, 0, sizeof(buffer));
+	buffer[0] = msg_count;
+	memcpy(&buffer[1], &bitfield_1, sizeof(bitfield_1));
+	
+	/* re-broadcast the current bitfield n times */
+	for (int i = 0; i < 20; i++) 
+	{
+		NWK_DELAY(100);
+		printf("s: %d \n", SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer)));
+		BSP_TOGGLE_LED1();
+	}
+	
+	/* shut the radio down */
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+}
 
-    /* check "sensor" to see if we need to send an alert */
-    if (BSP_BUTTON1())
-    {
-      /* sensor activated. start babbling. */
-      start2Babble();
-    }
+static void listen()
+{
+	BSP_TURN_OFF_LED1();
 
-    /* wake up radio. we need it to listen for others babbling. */
+	uint32_t tmp_bitfield = 0;
+	uint8_t len = 0;
+	
+	/* wake up radio. We need it to listen for broadcasts */
     SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
     /* turn on RX. default is RX off. */
     SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
 
-    /* stay on "long enough" to see if someone else is babbling */
+    /* stay in receive mode for a while */
     SPIN_ABOUT_A_QUARTER_SECOND;
 
-    /* we're done with radio. shut it down */
+    /* shut the radio down */
     SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 
-    /* got message? */
-    if (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, msg, &len))
-    {
-      /* got something. is it bad news? */
-      if (len && (msg[0] == BAD_NEWS))
-      {
-        /* Yep. start babbling. If there is a filtering token make
-         * sure the token matches the expected value.
-         */
-        start2Babble();
-      }
-    }
-  }
-}
-
-
-void toggleLED(uint8_t which)
-{
-  if (1 == which)
-  {
-    BSP_TOGGLE_LED1();
-  }
-  else if (2 == which)
-  {
-    BSP_TOGGLE_LED2();
-  }
-  return;
-}
-
-
-static void start2Babble()
-{
-  uint8_t msg[1];
-  
-  /* wake up radio. */
-  SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
-
-  /* Send the bad news message. To prevent confusion with different "networks"
-   * such as neighboring smoke alarm arrays send a token controlled by a DIP 
-   * switch, for example, and filter in this token. 
-   */
-  msg[0] = BAD_NEWS;
-  while (1)
-  {
-    /*wait "a while" */
-    NWK_DELAY(100);
-    /* babble... */
-    SMPL_Send(SMPL_LINKID_USER_UUD, msg, sizeof(msg));
-    BSP_TOGGLE_LED1();
-  }
+    /* we might have received multiple messages, iterate over the receive buffer
+	 * to make sure all messages are being processed */
+	while (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, buffer, &len)) 
+	{
+		BSP_TURN_ON_LED1();
+		if (buffer[0] == msg_count) {
+			tmp_bitfield = (uint32_t)*(&buffer[1]);
+			bitfield_1 |= tmp_bitfield;
+		}
+	}
+	printBitfield(&bitfield_1);
 }
