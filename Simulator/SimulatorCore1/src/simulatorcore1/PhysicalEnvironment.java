@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package simulatorcore1;
 
 import java.util.HashMap;
@@ -10,24 +6,43 @@ import java.util.HashMap;
  *
  * @author maltanar
  */
-public class PhysicalEnvironment 
+public class PhysicalEnvironment implements SimulationItem
 {
     private HashMap<Integer, SensorNode> m_sensorNodes;
     private int m_width, m_height;
+    private int m_maxNetworkSize;
     
     public PhysicalEnvironment(int width, int height)
     {
         m_sensorNodes = new HashMap<Integer, SensorNode>();
         m_width = width;
         m_height = height;
+        m_maxNetworkSize = 255;
     }
     
     public int createNode()
     {
+        if(getNodeCount() >= m_maxNetworkSize)
+        {
+            System.out.printf("PhysicalEnvironment: Allowed node count exceeded!"
+                               + " (%d) \n", m_maxNetworkSize);
+            return 0;
+        }
+        // new node ID is next available integer ID
         Integer newNodeID = m_sensorNodes.size() + 1;
-        // create a randomized location for the new node
+        
+        // create default config for new sensors
+        // TODO make this customizable
+        SensorConfig cfg = new SensorConfig();
+        cfg.arbitrationMode = SensorConfig.ArbitrationMode.ARBITRATE_ODDEVEN;
+        cfg.cycleCount = 3;
+        cfg.rxDurationMs = 1000;
+        cfg.txDurationMs = 1000;
+        
+        // create a new node with randomized location 
         SensorNode newNode = new SensorNode(newNodeID, 
-                                            generateRandomPosition());
+                                            generateRandomPosition(),
+                                            cfg, getMaxNetworkSize());
         // add the new node to our list
         m_sensorNodes.put(newNodeID, newNode);
         
@@ -82,5 +97,18 @@ public class PhysicalEnvironment
     private int generateRandomNumber(int min, int max)
     {
         return min + (int)(Math.random() * ((max - min) + 1));
+    }
+
+    public int getMaxNetworkSize() {
+        return m_maxNetworkSize;
+    }
+
+    public void setMaxNetworkSize(int m_maxNetworkSize) {
+        this.m_maxNetworkSize = m_maxNetworkSize;
+    }
+    
+    @Override
+    public void timePassed(double passedTimeMs) {
+        System.out.println("PhysicalEnvironment::timePassed not implemented yet");
     }
 }

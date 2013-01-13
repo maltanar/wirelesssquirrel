@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package simulatorcore1;
 
 // simple class for representing sensor position data
@@ -21,6 +17,12 @@ public class SensorPosition
     public String toString()
     {
         return "(" + Integer.toString(x) + ", " + Integer.toString(y) + ")";
+    }
+    
+    void move(SensorPosition delta)
+    {
+        x += delta.x;
+        y += delta.y;
     }
     
 }

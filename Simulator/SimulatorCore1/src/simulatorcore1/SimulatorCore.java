@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package simulatorcore1;
 import java.util.Scanner;
 
@@ -13,9 +9,6 @@ import java.util.Scanner;
 public class SimulatorCore 
 {
 
-    /**
-     * @param args the command line arguments
-     */
     public static void main(String[] args) 
     {
         PhysicalEnvironment environment = new PhysicalEnvironment(100, 100);
@@ -32,7 +25,8 @@ public class SimulatorCore
         for (int i =1; i <= N; i++)
         {
             environment.createNode();
-        }
+        }   
+                
         
         //environment.createNode();
         //environment.createNode();
