@@ -72,14 +72,16 @@ static uint8_t buffer[MAX_APP_PAYLOAD];
 #define UNIQUE_ID 0x01
 
 static void countingAlgorithm(void);
-static void broadcast(void);
-static void listen(void);
+static void broadcastBitfield(void);
+static void listenBitfield(void);
+static void broadcastSync(void);
+static void waitSync(void);
 static void printBitfield(const uint32_t* bf);
 
 void printBitfield(const uint32_t *bf)
 {
 	printf("bf: ");
-	for (uint8_t i = 0; i < sizeof(uint32_t) ; i++)
+	for (uint8_t i = 0; i < 32 ; i++)
 	{
 		printf("%d", (*bf & 1<<i)? 1:0);
 	}
@@ -101,17 +103,10 @@ void main (void)
 	*/
 	SMPL_Init(0);
 	
+	/* wait for a sync message or a button press to start the process... */
+	waitSync();
+	
 	BSP_TURN_ON_LED1();
-	
-	/* wait for a button press... */
-	do {
-		if (BSP_BUTTON1())
-		{
-			break;
-		}
-	} while (1);
-	
-	BSP_TURN_OFF_LED1();
 	
 	/* never coming back... */
 	countingAlgorithm();
@@ -123,31 +118,29 @@ void main (void)
 static void countingAlgorithm()
 {
 	uint8_t i;
-	
-	/* start the radio off sleeping */
-	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
-	
+
 	while (1)
 	{
+		/* enter listen mode if button is pressed */
+		if (BSP_BUTTON1())
+		{
+			listenBitfield();
+		}
+		/* broadcast sync message and unique ID */
+		broadcastSync();
+		broadcastBitfield();
+		
 		/* spoof MCU sleeping... */
-		BSP_TURN_ON_LED1();
+		BSP_TURN_OFF_LED1();
 		for (i=0; i<CHECK_RATE; ++i)
 		{
 			SPIN_ABOUT_A_SECOND;
 		}
-		BSP_TURN_OFF_LED1();
-		
-		/* enter listen mode if button is pressed */
-		if (BSP_BUTTON1())
-		{
-			listen();
-		}
-		/* broadcast unique ID */
-		broadcast();
+		BSP_TURN_ON_LED1();
 	}
 }
 
-static void broadcast()
+static void broadcastBitfield()
 {
 	/* wake up radio. */
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
@@ -164,7 +157,7 @@ static void broadcast()
 	for (int i = 0; i < 20; i++) 
 	{
 		NWK_DELAY(100);
-		printf("s: %d \n", SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer)));
+		SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer));
 		BSP_TOGGLE_LED1();
 	}
 	
@@ -172,7 +165,7 @@ static void broadcast()
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 }
 
-static void listen()
+static void listenBitfield()
 {
 	BSP_TURN_OFF_LED1();
 
@@ -202,3 +195,65 @@ static void listen()
 	}
 	printBitfield(&bitfield_1);
 }
+
+static void waitSync()
+{
+	uint8_t len = 0;
+	
+	BSP_TURN_OFF_LED1();
+	
+	/* wake up radio. We need it to listen for broadcasts */
+    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
+    /* turn on RX. default is RX off. */
+    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
+
+	/* enter a infinite loop, listening for a sync message from the Network.
+	 * When the message is received start the RTC to sync to the Nw and break 
+	 * the loop */
+    bool exitLoop = false;
+	while (1) 
+	{
+		/* stay in receive mode for a while */
+		NWK_DELAY(50);
+	
+		/* we might have received multiple messages, iterate over the receive buffer
+		 * to make sure all messages are being processed */
+		while (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, buffer, &len)) 
+		{
+			BSP_TURN_ON_LED1();
+			if (buffer[0] == msg_sync) {
+				// sync message from network received -> start the RTC 
+				
+				exitLoop = true;
+				break;
+			}
+		}
+		
+		/* check if the user pressed the "start network" button */
+		if (exitLoop || BSP_BUTTON1()) 
+		{
+			break;
+		}
+	}
+	
+	/* shut the radio down */
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+}
+
+/* broadcasts a message of the syncronization type */
+static void broadcastSync()
+{
+	/* wake up radio. */
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
+	
+	/* create a sync message in the transmit buffer */
+	memset(buffer, 0, sizeof(buffer));
+	buffer[0] = msg_sync;
+	
+	/* broadcast the sync message (only transmit the message type byte of the msg) */
+	SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(uint8_t));
+
+	/* shut the radio down */
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+}
+	
