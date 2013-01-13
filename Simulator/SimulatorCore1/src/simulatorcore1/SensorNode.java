@@ -1,8 +1,10 @@
 package simulatorcore1;
 
-public class SensorNode 
+// TODO add stochastic movement model to sensor nodes
+
+public class SensorNode implements SimulationItem
 {
-    // member variables
+    // member variables ******************************************************
     private Integer m_nodeID;   // unique node identifier
     private SensorPosition m_position;  // sensor node position in environment
     private SensorState m_state;    // node state
@@ -10,7 +12,7 @@ public class SensorNode
     private SensorConfig m_newConfig;   // new node config, takes effect after
                                         // reset
     
-    // internal type definitions
+    // internal type definitions *********************************************
     
     // possible states that a sensor node can be in
     private enum SensorState {
@@ -19,6 +21,8 @@ public class SensorNode
         STATE_TRANSMIT,     // sensor is sending presence bitfield data
         STATE_RECEIVE       // sensor is listening for presence bitfield data
     }
+    
+    // member methods *********************************************************
     
     // constructor for the SensorNode - initialize member variables
     public SensorNode(Integer nodeID, SensorPosition position,
@@ -63,6 +67,11 @@ public class SensorNode
         this.m_position = m_position;
     }
     
+    public void moveBy(SensorPosition movementDelta)
+    {
+        this.m_position.move(movementDelta);
+    }
+    
     // returns the current current consumption estimate by this node in mA
     // this depends on the current state (sleeping, transmitting, etc.)
     public double getCurrentConsumption() {
@@ -88,6 +97,14 @@ public class SensorNode
         }
                 
         return i;
+    }
+    
+    // methods implemented from SimulationItem interface **********************
+    
+    @Override
+    public void timePassed(double passedTimeMs) 
+    {
+        System.out.println("SensorNode::timePassed not implemented yet");
     }
             
 }

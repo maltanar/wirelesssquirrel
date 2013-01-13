@@ -23,4 +23,10 @@ public class SensorPosition
         return "(" + Integer.toString(x) + ", " + Integer.toString(y) + ")";
     }
     
+    void move(SensorPosition delta)
+    {
+        x += delta.x;
+        y += delta.y;
+    }
+    
 }

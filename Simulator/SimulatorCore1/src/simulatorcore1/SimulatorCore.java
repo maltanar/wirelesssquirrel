@@ -32,7 +32,8 @@ public class SimulatorCore
         for (int i =1; i <= N; i++)
         {
             environment.createNode();
-        }
+        }   
+                
         
         //environment.createNode();
         //environment.createNode();

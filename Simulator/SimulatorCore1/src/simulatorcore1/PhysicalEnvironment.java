@@ -10,7 +10,7 @@ import java.util.HashMap;
  *
  * @author maltanar
  */
-public class PhysicalEnvironment 
+public class PhysicalEnvironment implements SimulationItem
 {
     private HashMap<Integer, SensorNode> m_sensorNodes;
     private int m_width, m_height;
@@ -93,5 +93,11 @@ public class PhysicalEnvironment
     private int generateRandomNumber(int min, int max)
     {
         return min + (int)(Math.random() * ((max - min) + 1));
+    }
+
+    
+    @Override
+    public void timePassed(double passedTimeMs) {
+        System.out.println("PhysicalEnvironment::timePassed not implemented yet");
     }
 }
