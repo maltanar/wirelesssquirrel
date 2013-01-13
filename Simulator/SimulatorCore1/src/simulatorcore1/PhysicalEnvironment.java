@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package simulatorcore1;
 
 import java.util.HashMap;
@@ -14,16 +10,24 @@ public class PhysicalEnvironment implements SimulationItem
 {
     private HashMap<Integer, SensorNode> m_sensorNodes;
     private int m_width, m_height;
+    private int m_maxNetworkSize;
     
     public PhysicalEnvironment(int width, int height)
     {
         m_sensorNodes = new HashMap<Integer, SensorNode>();
         m_width = width;
         m_height = height;
+        m_maxNetworkSize = 255;
     }
     
     public int createNode()
     {
+        if(getNodeCount() >= m_maxNetworkSize)
+        {
+            System.out.printf("PhysicalEnvironment: Allowed node count exceeded!"
+                               + " (%d) \n", m_maxNetworkSize);
+            return 0;
+        }
         // new node ID is next available integer ID
         Integer newNodeID = m_sensorNodes.size() + 1;
         
@@ -38,7 +42,7 @@ public class PhysicalEnvironment implements SimulationItem
         // create a new node with randomized location 
         SensorNode newNode = new SensorNode(newNodeID, 
                                             generateRandomPosition(),
-                                            cfg);
+                                            cfg, getMaxNetworkSize());
         // add the new node to our list
         m_sensorNodes.put(newNodeID, newNode);
         
@@ -95,6 +99,13 @@ public class PhysicalEnvironment implements SimulationItem
         return min + (int)(Math.random() * ((max - min) + 1));
     }
 
+    public int getMaxNetworkSize() {
+        return m_maxNetworkSize;
+    }
+
+    public void setMaxNetworkSize(int m_maxNetworkSize) {
+        this.m_maxNetworkSize = m_maxNetworkSize;
+    }
     
     @Override
     public void timePassed(double passedTimeMs) {

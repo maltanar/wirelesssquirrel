@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package simulatorcore1;
 
 // encapsulate the data and functionality we expect from presence data that
@@ -38,14 +34,14 @@ public class PresenceData
             m_presenceFlags[i] = m_presenceFlags[i] || data.getPresence(i);
     }
     
-    public Boolean getPresence(int index)
+    public Boolean getPresence(int nodeID)
     {
-        return m_presenceFlags[index];
+        return m_presenceFlags[nodeID - 1]; // nodeID starts from 1
     }
     
-    public void setPresence(int index)
+    public void setPresence(int nodeID)
     {
-        m_presenceFlags[index] = Boolean.TRUE;
+        m_presenceFlags[nodeID] = Boolean.TRUE;
     }
     
     // helper function - set all presence fields to 0
@@ -75,5 +71,22 @@ public class PresenceData
         result.trim();
         
         return result;
+    }
+    
+    public void fromString(String data)
+    {
+        if(data.length() != m_size)
+        {
+            System.out.printf("PresenceData::fromString length mismatch!"
+                              + " %d %d \n", data.length(), m_size);
+            return;
+        }
+        
+        // treat each character in the string as a boolean value and
+        // update internal flags according to this
+        for(int i = 0; i < m_size; i++)
+            m_presenceFlags[i] = (data.charAt(i) == '0' ? 
+                                    Boolean.FALSE : Boolean.TRUE);
+        
     }
 }

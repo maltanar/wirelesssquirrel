@@ -11,6 +11,7 @@ public class SensorNode implements SimulationItem
     private SensorConfig m_config;  // node config
     private SensorConfig m_newConfig;   // new node config, takes effect after
                                         // reset
+    private PresenceData m_presenceData;    // local presence data
     
     // internal type definitions *********************************************
     
@@ -26,12 +27,13 @@ public class SensorNode implements SimulationItem
     
     // constructor for the SensorNode - initialize member variables
     public SensorNode(Integer nodeID, SensorPosition position,
-                      SensorConfig config)
+                      SensorConfig config, int maxNetworkSize)
     {
         m_nodeID = nodeID;
         m_position = position;
         m_config = m_newConfig = config;
         m_state = SensorState.STATE_INIT;
+        m_presenceData = new PresenceData(maxNetworkSize);
         
         System.out.println("Node with id " + nodeID + " created at " + 
                             position);
