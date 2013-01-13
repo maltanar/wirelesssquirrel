@@ -24,10 +24,21 @@ public class PhysicalEnvironment
     
     public int createNode()
     {
+        // new node ID is next available integer ID
         Integer newNodeID = m_sensorNodes.size() + 1;
-        // create a randomized location for the new node
+        
+        // create default config for new sensors
+        // TODO make this customizable
+        SensorConfig cfg = new SensorConfig();
+        cfg.arbitrationMode = SensorConfig.ArbitrationMode.ARBITRATE_ODDEVEN;
+        cfg.cycleCount = 3;
+        cfg.rxDurationMs = 1000;
+        cfg.txDurationMs = 1000;
+        
+        // create a new node with randomized location 
         SensorNode newNode = new SensorNode(newNodeID, 
-                                            generateRandomPosition());
+                                            generateRandomPosition(),
+                                            cfg);
         // add the new node to our list
         m_sensorNodes.put(newNodeID, newNode);
         

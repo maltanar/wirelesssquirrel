@@ -4,8 +4,11 @@ public class SensorNode
 {
     // member variables
     private Integer m_nodeID;   // unique node identifier
-    private SensorPosition m_position;  // 
-    private SensorState m_state;
+    private SensorPosition m_position;  // sensor node position in environment
+    private SensorState m_state;    // node state
+    private SensorConfig m_config;  // node config
+    private SensorConfig m_newConfig;   // new node config, takes effect after
+                                        // reset
     
     // internal type definitions
     
@@ -17,16 +20,35 @@ public class SensorNode
         STATE_RECEIVE       // sensor is listening for presence bitfield data
     }
     
-    
     // constructor for the SensorNode - initialize member variables
-    public SensorNode(Integer nodeID, SensorPosition position)
+    public SensorNode(Integer nodeID, SensorPosition position,
+                      SensorConfig config)
     {
         m_nodeID = nodeID;
         m_position = position;
+        m_config = m_newConfig = config;
         m_state = SensorState.STATE_INIT;
         
         System.out.println("Node with id " + nodeID + " created at " + 
                             position);
+    }
+    
+    public void resetNode()
+    {
+        // TODO implement full reset functionality here
+        m_config = m_newConfig;
+        m_state = SensorState.STATE_INIT;
+    }
+    
+    // note: config setting only takes place after node reset!
+    public void setNodeConfig(SensorConfig newConfig)
+    {
+        m_newConfig = newConfig;
+    }
+    
+    public SensorConfig getNodeConfig()
+    {
+        return m_config;
     }
 
     public Integer getNodeID() {
@@ -39,5 +61,33 @@ public class SensorNode
 
     public void setPosition(SensorPosition m_position) {
         this.m_position = m_position;
-    }    
+    }
+    
+    // returns the current current consumption estimate by this node in mA
+    // this depends on the current state (sleeping, transmitting, etc.)
+    public double getCurrentConsumption() {
+        double i = 0.0;
+        // TODO get accurate values from real devices for these
+        switch(m_state)
+        {
+            case STATE_INIT:
+                i = 10.0;
+                break;
+            case STATE_CYCLE_SLEEP:
+                i = 0.001;
+                break;
+            case STATE_TRANSMIT:
+                i = 30;
+                break;
+            case STATE_RECEIVE:
+                i = 20;
+                break;
+            default:
+                // unrecognized device state
+                System.out.println("Unrecognized sensor state!");
+        }
+                
+        return i;
+    }
+            
 }
