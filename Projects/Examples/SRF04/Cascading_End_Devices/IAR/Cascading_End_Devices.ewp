@@ -1040,15 +1040,15 @@
         <debug>1</debug>
         <option>
           <name>DerivativeDescriptionFile</name>
-          <state>$TOOLKIT_DIR$\config\devices\Texas Instruments\CC2430F128.i51</state>
+          <state>$TOOLKIT_DIR$\config\devices\Texas Instruments\CC2431F128.i51</state>
         </option>
         <option>
           <name>Previous Derivative File</name>
-          <state>$TOOLKIT_DIR$\config\devices\Texas Instruments\CC2430F128.i51</state>
+          <state>$TOOLKIT_DIR$\config\devices\Texas Instruments\CC2431F128.i51</state>
         </option>
         <option>
           <name>Showed Derivative</name>
-          <state>CC2430F128</state>
+          <state>CC2431F128</state>
         </option>
         <option>
           <name>CPU Core</name>
@@ -1183,7 +1183,7 @@
         </option>
         <option>
           <name>RTLibraryPath</name>
-          <state>$TOOLKIT_DIR$\LIB\CLIB\cl-pli-nlxd-1e16x01.r51</state>
+          <state>$TOOLKIT_DIR$\LIB\CLIB\cl-e2i-2lxd-1e16x01.r51</state>
         </option>
         <option>
           <name>Input variant</name>
@@ -1381,7 +1381,7 @@
         <option>
           <name>CCAllowList</name>
           <version>1</version>
-          <state>11111</state>
+          <state>00000</state>
         </option>
         <option>
           <name>CCObjUseModuleName</name>
@@ -1505,7 +1505,7 @@
         </option>
         <option>
           <name>CCOptLevel</name>
-          <state>3</state>
+          <state>0</state>
         </option>
         <option>
           <name>CCOptStrategy</name>
@@ -1514,7 +1514,7 @@
         </option>
         <option>
           <name>CCOptLevelSlave</name>
-          <state>3</state>
+          <state>0</state>
         </option>
         <option>
           <name>CompilerMisraRules04</name>
@@ -1777,7 +1777,7 @@
         </option>
         <option>
           <name>XclFile</name>
-          <state>$TOOLKIT_DIR$\config\devices\Texas Instruments\lnk51ew_CC2430F128.xcl</state>
+          <state>$TOOLKIT_DIR$\config\devices\Texas Instruments\lnk51ew_CC2431F128_banked_ext2.xcl</state>
         </option>
         <option>
           <name>XclFileSlave</name>
