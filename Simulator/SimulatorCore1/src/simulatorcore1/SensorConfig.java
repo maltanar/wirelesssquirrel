@@ -7,10 +7,6 @@ public class SensorConfig {
     public double   rxDurationMs;   // how many ms will be spent receiving
     public int      cycleCount;     // how many times the rx-tx cycle will
                                     // be repeated
-    public double   rxSensitivitydBm;  // the max rx sensitivity in dBm - we use 
-                                    // this as an absolute threshold below which
-                                    // we cannot receive msgs
-    public double   txPowerdBm;        // radio tx power (nominal) in dBm
     
     // possible values for the arbitration node
     public enum ArbitrationMode {
