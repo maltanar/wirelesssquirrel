@@ -49,21 +49,9 @@
 typedef enum msg_type
 {
 	msg_sync = 0x01,
-	msg_count = 0x05
+	msg_collect = 0x02,
+	msg_count = 0x04
 }msg_type;
-
-/* to be able to use bit operations we have to use integers to represent the bitfield.
- * The devices are capable of tranmitting up to 10bytes in one transmission. As the first
- * byte of every message is used to define the message type, we can count up to 
- * 32+32+8 = 72 nodes with this basic scheme. It is easily extendable by adding
- * msg_count_2 message type, that carries another 72 nodes and so on */ 
-static uint32_t bitfield_1;
-static uint8_t buffer[MAX_APP_PAYLOAD];
-
-/* two global variables used for the period functionality */
-static volatile bool activePeriod;
-static volatile uint32_t activePeriodOfLimit;
-
 
 /* unique ID for this network node, also used to decide the order of the algorithm steps */
 #define UNIQUE_ID 0x01
@@ -71,6 +59,25 @@ static volatile uint32_t activePeriodOfLimit;
 #define BROADCAST_ITERATIONS 4	
 /* radio active period during broadcast and listen step (in multiples of 100ms)*/
 #define RADIO_PERIOD 10
+/* set the number of bitfields to keep in memory */
+#define BITFIELD_MEMORY 10
+
+/* to be able to use bit operations we have to use integers to represent the bitfield.
+ * The devices are capable of tranmitting up to 10bytes in one transmission. As the first
+ * byte of every message is used to define the message type, we can count up to 
+ * 32+32+8 = 72 nodes with this basic scheme. It is easily extendable by adding
+ * msg_count_2 message type, that carries another 72 nodes and so on */ 
+static uint32_t bitfieldA;
+static uint8_t buffer[MAX_APP_PAYLOAD];
+
+/* two global variables used for the period functionality */
+static volatile bool activePeriod;
+static volatile uint32_t activePeriodOfLimit;
+
+/* reserve memory space in XDATA memory locations, that contains data in sleep modes 2 and 3 
+ * and is used to store the last n bitfields */
+__xdata static uint32_t bitfieldMemory[BITFIELD_MEMORY];
+__xdata static uint8_t bfIdx = 0;
 
 /* define Interrupt handler function for timer1 overflow IR */
 #pragma vector=0x4b
@@ -82,6 +89,8 @@ static void broadcastBitfield(void);
 static void listenBitfield(void);
 static void broadcastSync(void);
 static void waitSync(void);
+static void storeBitfield(const uint32_t *bitfield);
+static void transmitBitfields(void);
 static void setActivePeriod(uint32_t timeoutX100ms);
 
 
@@ -99,7 +108,7 @@ void main (void)
 	* we supply a callback pointer to handle the message returned by the peer.
 	*/
 	SMPL_Init(0);
-		
+	
 	/* wait for a sync message or a button press to start the process... */
 	waitSync();
 		
@@ -140,7 +149,10 @@ static void countingAlgorithm()
 				broadcastBitfield();
 			}
 		}
-	
+		
+		/* store the bitfield in a list in memory */
+		storeBitfield(&bitfieldA);
+					  
 		/* spoof MCU sleeping... */
 		BSP_TURN_OFF_LED1();
 		setActivePeriod(100);
@@ -154,12 +166,12 @@ static void broadcastBitfield()
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
 	
 	/* set the own bit in the bitfield */
-	bitfield_1 |= 1 << UNIQUE_ID;
+	bitfieldA |= 1 << UNIQUE_ID;
 	
 	/* copy the current bitfield into the transmit buffer */
 	memset(buffer, 0, sizeof(buffer));
 	buffer[0] = msg_count;
-	memcpy(&buffer[1], &bitfield_1, sizeof(bitfield_1));
+	memcpy(&buffer[1], &bitfieldA, sizeof(bitfieldA));
 	
 	/* broadcast the current bitfield one time */
 	bool bcast_sent = false;
@@ -199,7 +211,9 @@ static void listenBitfield()
 		{
 			if (buffer[0] == msg_count) {
 				tmp_bitfield = (uint32_t)*(&buffer[1]);
-				bitfield_1 |= tmp_bitfield;
+				bitfieldA |= tmp_bitfield;
+			} else if (buffer[0] == msg_collect) {
+				transmitBitfields();
 			}
 		}
 	}
@@ -260,6 +274,47 @@ static void broadcastSync()
 
 	/* shut the radio down */
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+}
+
+/* function to store the current bitfield in a memory location that's not lost
+ * when the device enters sleep mode 2 or 3 */
+void storeBitfield(const uint32_t *bitfield)
+{
+	/* if the storage is full, shift the content by one and add the bitfield to 
+	 * the end of the list */
+	if (bfIdx >= BITFIELD_MEMORY) 
+	{
+		for (uint8_t i = 0; i < BITFIELD_MEMORY-1; i++)
+		{
+			bitfieldMemory[i] = bitfieldMemory[i+i];
+		}
+		bitfieldMemory[bfIdx-1] = *bitfield;
+	} else
+	{
+		bitfieldMemory[bfIdx++] = *bitfield;
+	}
+}
+
+/* opens up a link for a data-collection device to connect to, if the connection
+ * is established, the stored bitfields are sent out. If no connection is established
+ * after a period of time, the function returns and the device enters the sleep mode
+ * again */
+void transmitBitfields(void)
+{
+	/* open up a link for the data-collection device, by default this function
+	 * waits for 5 seconds, use LINKLISTEN_MILLISECONDS_2_WAIT (nwk_api.c) to modify */
+	linkID_t linkID;
+	if (SMPL_TIMEOUT == SMPL_LinkListen(&linkID))
+		/* return early if no connection is established within the timelimit */
+		return;
+	
+	/* transmit all stored bitfields to the data-collection device */
+	for (uint8_t i = 0; i < bfIdx; i++)
+	{
+		if (SMPL_SUCCESS != SMPL_Send(linkID, (uint8_t*)&bitfieldMemory[i], sizeof(bitfieldMemory[0])))
+			/* transmission failed, end transmission */
+			break;
+	}
 }
 
 /* function for setting the global "activePeriod" variable to true after n * 100 ms have passed */
