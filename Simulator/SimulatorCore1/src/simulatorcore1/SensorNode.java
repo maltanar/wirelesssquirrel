@@ -2,6 +2,10 @@ package simulatorcore1;
 
 // TODO add stochastic movement model to sensor nodes
 
+import java.util.LinkedList;
+import java.util.Queue;
+
+
 public class SensorNode implements SimulationItem
 {
     // member variables ******************************************************
@@ -12,6 +16,9 @@ public class SensorNode implements SimulationItem
     private SensorConfig m_newConfig;   // new node config, takes effect after
                                         // reset
     private PresenceData m_presenceData;    // local presence data
+    private Boolean m_isRxActive;
+    private Boolean m_isTxActive;
+    private LinkedList<String> m_rfMessageQueueRx, m_rfMessageQueueTx;
     
     // internal type definitions *********************************************
     
@@ -32,8 +39,11 @@ public class SensorNode implements SimulationItem
         m_nodeID = nodeID;
         m_position = position;
         m_config = m_newConfig = config;
+        m_isRxActive = m_isTxActive = Boolean.FALSE;
         m_state = SensorState.STATE_INIT;
         m_presenceData = new PresenceData(maxNetworkSize);
+        m_rfMessageQueueRx = new LinkedList<String>();
+        m_rfMessageQueueTx = new LinkedList<String>();
         
         System.out.println("Node with id " + nodeID + " created at " + 
                             position);
@@ -44,6 +54,10 @@ public class SensorNode implements SimulationItem
         // TODO implement full reset functionality here
         m_config = m_newConfig;
         m_state = SensorState.STATE_INIT;
+        m_rfMessageQueueRx.clear();
+        m_rfMessageQueueTx.clear();
+        m_presenceData.resetAll();
+        m_isRxActive = m_isTxActive = Boolean.FALSE;
     }
     
     // note: config setting only takes place after node reset!
@@ -99,6 +113,55 @@ public class SensorNode implements SimulationItem
         }
                 
         return i;
+    }
+    
+    // returns whether the node is actively listening for messages
+    public Boolean getRxActive()
+    {
+        return m_isRxActive;
+    }
+    
+    // returns whether the node is actively sending messages
+    public Boolean getTxActive()
+    {
+        return m_isTxActive;
+    }
+    
+    public void receiveRadioWaves(String data, double rxPower)
+    {
+        // do not receive anything if rx is not active
+        if(!m_isRxActive)
+            return;
+        
+        // cannot receive message if signal is too weak
+        if(rxPower < m_config.rxSensitivitydBm)
+            return;
+        
+        // otherwise, receive successful - add to a virtual "queue" of messages
+        // TODO here would be a good place to implement dropping messages
+        // if they are coming in too quickly
+        m_rfMessageQueueRx.add(data);
+        
+        System.out.printf("Node %d received %s \n", m_nodeID, data);
+    }
+    
+    public void sendRadioWaves(String data)
+    {
+        // do not transmit anything if tx is not active
+        if(!m_isTxActive)
+            return;
+        
+        m_rfMessageQueueTx.add(data);
+    }
+    
+    // return and remove first element of the queue if there are pending tx
+    // messages, empty string otherwise
+    public String getFromTxQueue()
+    {
+        if(m_rfMessageQueueTx.size() > 0)
+            return m_rfMessageQueueTx.removeFirst();
+        else
+            return "";
     }
     
     // methods implemented from SimulationItem interface **********************

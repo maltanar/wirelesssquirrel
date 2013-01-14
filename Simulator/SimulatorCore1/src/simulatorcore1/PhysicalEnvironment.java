@@ -1,6 +1,7 @@
 package simulatorcore1;
 
 import java.util.HashMap;
+import java.util.Iterator;
 
 /**
  *
@@ -38,6 +39,8 @@ public class PhysicalEnvironment implements SimulationItem
         cfg.cycleCount = 3;
         cfg.rxDurationMs = 1000;
         cfg.txDurationMs = 1000;
+        cfg.txPowerdBm = -0.4;         // suggested value from CC2430 datasheet
+        cfg.rxSensitivitydBm = -92;    // suggested value from CC2430 datasheet
         
         // create a new node with randomized location 
         SensorNode newNode = new SensorNode(newNodeID, 
@@ -105,6 +108,34 @@ public class PhysicalEnvironment implements SimulationItem
 
     public void setMaxNetworkSize(int m_maxNetworkSize) {
         this.m_maxNetworkSize = m_maxNetworkSize;
+    }
+    
+    public void propagateRadioWaves(String message, SensorNode origin, 
+                                   double txPower)
+    {
+        // TODO how should we use txPower to make the calculation more
+        // realistic?
+        // TODO use precomputed node distance table here
+        Iterator<SensorNode> nodes = m_sensorNodes.values().iterator();
+        double rxPower = 0;
+        double wavelength = (3*10^8 / (2445*10^6));
+        int distance = 0;
+        while(nodes.hasNext())
+        {
+            SensorNode node = nodes.next();
+            // TODO maybe only attempt to propagate broadcast to other nodes?
+            // theoretically a node could receive its own broadcast if it 
+            // started listening right after sending and there were some 
+            // reflected waves coming...
+            // calculate distance in meters
+            distance = calculateDistance(origin, node);
+            // use Friis equation to calculate rx power on the destination node
+            // antenna gains assumed to be 0 dB
+            rxPower = txPower + 20 * Math.log10(wavelength 
+                                                / (4 * Math.PI * distance));
+            // expose target node to radio waves
+            node.receiveRadioWaves(message, rxPower);
+        }
     }
     
     @Override
