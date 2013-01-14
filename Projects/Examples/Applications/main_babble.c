@@ -60,6 +60,10 @@ typedef enum msg_type
 static uint32_t bitfield_1;
 static uint8_t buffer[MAX_APP_PAYLOAD];
 
+/* two global variables used for the period functionality */
+static volatile bool activePeriod;
+static volatile uint32_t activePeriodOfLimit;
+
 /* For FHSS systems, calls to NWK_DELAY() will also call nwk_pllBackgrounder()
  * during the delay time so if you use the system delay mechanism in a loop,
  * you don't need to also call the nwk_pllBackgrounder() function.
@@ -71,21 +75,28 @@ static uint8_t buffer[MAX_APP_PAYLOAD];
 
 #define UNIQUE_ID 0x01
 
+#pragma vector=0x4b
+__interrupt void timer1IR(void);
+
 static void countingAlgorithm(void);
 static void broadcastBitfield(void);
 static void listenBitfield(void);
 static void broadcastSync(void);
 static void waitSync(void);
-static void printBitfield(const uint32_t* bf);
+static void setActivePeriod(uint32_t timeoutX100ms);
 
-void printBitfield(const uint32_t *bf)
-{
-	printf("bf: ");
-	for (uint8_t i = 0; i < 32 ; i++)
+__interrupt void timer1IR(void){
+	static uint32_t ofCnt = 0;
+	ofCnt++;
+	
+	/* check if the active period has expired */
+	if (ofCnt >= activePeriodOfLimit) 
 	{
-		printf("%d", (*bf & 1<<i)? 1:0);
+		activePeriod = false;
+		ofCnt = 0;
+		/* stop the timer */
+		T1CTL &= !(1<<1);
 	}
-	printf("\n");
 }
 
 void main (void)
@@ -102,6 +113,18 @@ void main (void)
 	* we supply a callback pointer to handle the message returned by the peer.
 	*/
 	SMPL_Init(0);
+	
+	setActivePeriod(10);
+	while (activePeriod);
+	BSP_TOGGLE_LED1();
+	
+	setActivePeriod(10);
+	while (activePeriod);
+	BSP_TOGGLE_LED1();
+	
+	setActivePeriod(100);
+	while (activePeriod);
+	BSP_TOGGLE_LED1();
 	
 	/* wait for a sync message or a button press to start the process... */
 	waitSync();
@@ -120,7 +143,7 @@ static void countingAlgorithm()
 	uint8_t i;
 
 	while (1)
-	{
+	{ 
 		/* enter listen mode if button is pressed */
 		if (BSP_BUTTON1())
 		{
@@ -176,7 +199,7 @@ static void listenBitfield()
     SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
     /* turn on RX. default is RX off. */
     SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
-
+	
     /* stay in receive mode for a while */
     SPIN_ABOUT_A_QUARTER_SECOND;
 
@@ -193,7 +216,6 @@ static void listenBitfield()
 			bitfield_1 |= tmp_bitfield;
 		}
 	}
-	printBitfield(&bitfield_1);
 }
 
 static void waitSync()
@@ -255,5 +277,44 @@ static void broadcastSync()
 
 	/* shut the radio down */
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+}
+
+/* function for setting the global "activePeriod" variable to true after n * 100 ms have passed */
+void setActivePeriod(uint32_t period)
+{
+	/* set the global "activePeriod" variable and define the overflow limit 
+	 * (the times is configured to gererate one interrupt every 100ms) */
+	activePeriod = true;
+	activePeriodOfLimit = period;
+	
+	/* enable Timer 1 overflow interrupt */
+	TIMIF |= (6 << 1); 	// Timer1 overflow interrupt mask
+	IEN1 |= (1 << 1); 	// Timer1 interrupt enable
+	
+	/* enable global interrupts */
+	IEN0 |= (1 << 7);	// Each interrupt source is individually enabled or 
+						// disabled by setting its corresponding enable bit
+	
+	/* set the clock divede prescaler to the lowest possible value */
+	T1CTL = 0x0C; //set the clk divide to 128 -> increment every 4us
+	
+	/* generate an interrupt every 100ms
+	 * --> use module mode, with a compare value of 4us * 25000 = 100ms*/
+	union modulo
+	{ 
+		uint16_t val_16; 
+		uint8_t val_8[2]; 
+	};
+	union modulo mod;
+	mod.val_16 = 25000;
+	
+	T1CC0L = mod.val_8[0];
+	T1CC0H = mod.val_8[1];
+    
+	/* reset the counter to 0 */
+	T1CNTL = 0;
+	
+	/* Start Timer 1 in modulo mode */
+	T1CTL |= (1<<1);	
 }
 	
