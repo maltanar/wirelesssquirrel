@@ -90,6 +90,26 @@ void printBitfield(const uint32_t *bf)
 
 void main (void)
 {
+	
+  //////////////////////////////////////////////////////////////////////////
+  // CODE SECTION 1 : Switch to High Speed RC Oscillator
+  //     MUST BE EXECUTED BEFORE ENTERING POWER MODES
+  //////////////////////////////////////////////////////////////////////////
+  
+  // Power up the high speed RC Osc (SLEEP.OSC_PD = 0)
+  SLEEP &= ~0x04;
+  // Wait until this Osc is stable (SLEEP.HFRC_STABLE = 1)
+  while(!(SLEEP & 0x20));
+  // Switch the system clock to the RC Osc (CLKCON.OSC = 1)
+  CLKCON |= 0x40;
+  // Wait until clock has definitely changed
+  while(!(CLKCON &= 0x40));
+  // Power down 32Mhz crystal Osc (SLEEP.OSC_PD=1)
+  SLEEP |= 0x04;
+  ////////////////////////////////////////////////////////////////////////////
+  // CODE SECTION 1 : END
+  ////////////////////////////////////////////////////////////////////////////
+  
 	BSP_Init();
 	
 	/* Assign a unique address to the radio device, based on the the unique NW id.
@@ -109,7 +129,48 @@ void main (void)
 	BSP_TURN_ON_LED1();
 	
 	/* never coming back... */
-	countingAlgorithm();
+	
+	
+  ////////////////////////////////////////////////////////////////////
+  // Enter sleep mode 2
+  ////////////////////////////////////////////////////////////////////
+  
+  // Set Sleep mode to PM2
+  SLEEP = (SLEEP & 0xFC) | 0x02;
+  
+  // Apply 3 NOPs to allow any corresponding interrupt blocking to take
+  // effect before verifying SLEEP.MODE bits.
+  asm("NOP");
+  asm("NOP");
+  asm("NOP");
+  
+  // If no interrupts executed during the above NOPs the interrupts are
+  // all blocked by this point.
+  // If an ISR has fired the SLEEP.MODE bits are cleared and the mode
+  // will not be entered.
+  if(SLEEP & 0x03){
+     
+	  //Clear interrupt flags
+	  IRCON &= 0x00;
+	  
+	  // Enable Sleep Timer interrupt
+	  IEN0 &= 0xA0;
+	  
+	  // Set sleep timer to 1 minute
+	  ST2=0x1D;
+	  ST1=0x4C;
+	  ST0=0x00;
+	  
+	  // Set PCON.IDLE to enter the power mode
+	 PCON |= 0x01;
+	 
+	 // SOC now in PM2 and will only wake up when Sleep timer times out
+	 
+	 // Apply a NOP as first instruction when exiting sleep mode
+	 asm("NOP");
+  }
+  
+  BSP_TURN_OFF_LED1();
 	
 	/* but in case we do... */
 	while (1) ;
