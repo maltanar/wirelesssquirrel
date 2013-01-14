@@ -87,7 +87,8 @@ void printBitfield(const uint32_t *bf)
 	}
 	printf("\n");
 }
-
+static unsigned char st2 =0, st1=0, st0=0;
+static unsigned long countVal=0;
 void main (void)
 {
 	
@@ -112,8 +113,75 @@ void main (void)
   
 	BSP_Init();
 	
-	/* Assign a unique address to the radio device, based on the the unique NW id.
-	* The first three bytes can be selected arbitrarlily */
+	////////////////////////////////////////////////////////////////////
+  // Enter sleep mode 2
+  ////////////////////////////////////////////////////////////////////
+  
+	while(1)
+	{
+    // Set Sleep mode to PM2
+    SLEEP = (SLEEP & 0xFC) | 0x02;
+  
+    // Apply 3 NOPs to allow any corresponding interrupt blocking to take
+    // effect before verifying SLEEP.MODE bits.
+    asm("NOP");
+    asm("NOP");
+    asm("NOP");
+  
+    // If no interrupts executed during the above NOPs the interrupts are
+    // all blocked by this point.
+    // If an ISR has fired the SLEEP.MODE bits are cleared and the mode
+    // will not be entered.
+    if(SLEEP & 0x03){
+     
+	  //Clear interrupt flags
+	  IRCON = 0x00;
+	  
+	  // Enable Sleep Timer interrupt
+	  IEN0 |= 0xA0;
+	  
+	  
+	  
+	  st0 = ST0;
+	  st1 = ST1;
+	  st2 = ST2;
+	  
+	  countVal = (unsigned long)st2;
+	  countVal = countVal << 16;
+	  countVal |= (unsigned long)st1 << 8;
+	  countVal |= (unsigned long)st0;
+	  
+	  countVal = countVal + 0x28000;
+	  
+	  ST2 = (countVal>>16) & 0xFF;
+	  ST1 = (countVal>>8) & 0xFF;
+	  ST0 = countVal & 0xFF;
+	  
+	  while(!(ST0==(countVal & 0xFF)));
+	  
+	  BSP_TURN_OFF_LED1();
+	  // Set PCON.IDLE to enter the power mode
+	  PCON |= 0x01;
+	 
+	  // SOC now in PM2 and will only wake up when Sleep timer times out
+	 
+	  // Apply a NOP as first instruction when exiting sleep mode
+	  asm("NOP");
+    }
+
+   BSP_TURN_ON_LED1();
+   IRCON = 0x00;
+
+   IEN0 = 0x00;
+   SPIN_ABOUT_A_SECOND;
+   SPIN_ABOUT_A_SECOND;
+   SPIN_ABOUT_A_SECOND;
+   SPIN_ABOUT_A_SECOND;
+   SPIN_ABOUT_A_SECOND;
+}	
+
+/* Assign a unique address to the radio device, based on the the unique NW id.
+* The first three bytes can be selected arbitrarlily */
 	addr_t lAddr = {{0x71, 0x56, 0x34, UNIQUE_ID}};
 	SMPL_Ioctl(IOCTL_OBJ_ADDR, IOCTL_ACT_SET, &lAddr);
 	
