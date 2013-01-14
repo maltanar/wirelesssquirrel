@@ -64,20 +64,19 @@ static uint8_t buffer[MAX_APP_PAYLOAD];
 static volatile bool activePeriod;
 static volatile uint32_t activePeriodOfLimit;
 
-/* For FHSS systems, calls to NWK_DELAY() will also call nwk_pllBackgrounder()
- * during the delay time so if you use the system delay mechanism in a loop,
- * you don't need to also call the nwk_pllBackgrounder() function.
- */
-#define SPIN_ABOUT_A_SECOND           NWK_DELAY(1000)
-#define SPIN_ABOUT_A_QUARTER_SECOND   NWK_DELAY(250)
 
-#define CHECK_RATE (5)
-
+/* unique ID for this network node, also used to decide the order of the algorithm steps */
 #define UNIQUE_ID 0x01
+/* number of iterations of the (broadcast-listen) or (listen-broadcast) loop */
+#define BROADCAST_ITERATIONS 4	
+/* radio active period during broadcast and listen step (in multiples of 100ms)*/
+#define RADIO_PERIOD 10
 
+/* define Interrupt handler function for timer1 overflow IR */
 #pragma vector=0x4b
 __interrupt void timer1IR(void);
 
+/* function prototypes */
 static void countingAlgorithm(void);
 static void broadcastBitfield(void);
 static void listenBitfield(void);
@@ -85,19 +84,6 @@ static void broadcastSync(void);
 static void waitSync(void);
 static void setActivePeriod(uint32_t timeoutX100ms);
 
-__interrupt void timer1IR(void){
-	static uint32_t ofCnt = 0;
-	ofCnt++;
-	
-	/* check if the active period has expired */
-	if (ofCnt >= activePeriodOfLimit) 
-	{
-		activePeriod = false;
-		ofCnt = 0;
-		/* stop the timer */
-		T1CTL &= !(1<<1);
-	}
-}
 
 void main (void)
 {
@@ -113,24 +99,10 @@ void main (void)
 	* we supply a callback pointer to handle the message returned by the peer.
 	*/
 	SMPL_Init(0);
-	
-	setActivePeriod(10);
-	while (activePeriod);
-	BSP_TOGGLE_LED1();
-	
-	setActivePeriod(10);
-	while (activePeriod);
-	BSP_TOGGLE_LED1();
-	
-	setActivePeriod(100);
-	while (activePeriod);
-	BSP_TOGGLE_LED1();
-	
+		
 	/* wait for a sync message or a button press to start the process... */
 	waitSync();
-	
-	BSP_TURN_ON_LED1();
-	
+		
 	/* never coming back... */
 	countingAlgorithm();
 	
@@ -140,26 +112,39 @@ void main (void)
 
 static void countingAlgorithm()
 {
-	uint8_t i;
-
 	while (1)
 	{ 
-		/* enter listen mode if button is pressed */
-		if (BSP_BUTTON1())
-		{
-			listenBitfield();
-		}
-		/* broadcast sync message and unique ID */
+		/* broadcast that a new algorithm iteration starts, to allow new nodes
+		 * to join in */
 		broadcastSync();
-		broadcastBitfield();
 		
+		
+		/* start with listening / broadcasting depending on the unique id */
+		if (UNIQUE_ID % 2 == 0)
+		{
+			for (uint8_t i = 0; i < BROADCAST_ITERATIONS; i++)
+			{
+				BSP_TURN_ON_LED1();
+				broadcastBitfield();
+				BSP_TURN_OFF_LED1();
+				listenBitfield();
+			}
+		} 
+		else
+		{
+			for (uint8_t i = 0; i < BROADCAST_ITERATIONS; i++) 
+			{
+				BSP_TURN_OFF_LED1();
+				listenBitfield();
+				BSP_TURN_ON_LED1();
+				broadcastBitfield();
+			}
+		}
+	
 		/* spoof MCU sleeping... */
 		BSP_TURN_OFF_LED1();
-		for (i=0; i<CHECK_RATE; ++i)
-		{
-			SPIN_ABOUT_A_SECOND;
-		}
-		BSP_TURN_ON_LED1();
+		setActivePeriod(100);
+		while (activePeriod);
 	}
 }
 
@@ -176,12 +161,16 @@ static void broadcastBitfield()
 	buffer[0] = msg_count;
 	memcpy(&buffer[1], &bitfield_1, sizeof(bitfield_1));
 	
-	/* re-broadcast the current bitfield n times */
-	for (int i = 0; i < 20; i++) 
+	/* broadcast the current bitfield one time */
+	bool bcast_sent = false;
+	setActivePeriod(RADIO_PERIOD);
+	while (activePeriod)
 	{
-		NWK_DELAY(100);
-		SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer));
-		BSP_TOGGLE_LED1();
+		if (!bcast_sent)
+		{
+			SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer));
+			bcast_sent = true;
+		}
 	}
 	
 	/* shut the radio down */
@@ -200,22 +189,23 @@ static void listenBitfield()
     /* turn on RX. default is RX off. */
     SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
 	
-    /* stay in receive mode for a while */
-    SPIN_ABOUT_A_QUARTER_SECOND;
-
-    /* shut the radio down */
-    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
-
-    /* we might have received multiple messages, iterate over the receive buffer
-	 * to make sure all messages are being processed */
-	while (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, buffer, &len)) 
+    /* stay in receive mode for a fixed peridod of time */
+	setActivePeriod(RADIO_PERIOD);
+    while(activePeriod)
 	{
-		BSP_TURN_ON_LED1();
-		if (buffer[0] == msg_count) {
-			tmp_bitfield = (uint32_t)*(&buffer[1]);
-			bitfield_1 |= tmp_bitfield;
+		/* we might have received multiple messages, iterate over the receive buffer
+		 * to make sure all messages are being processed */
+		while (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, buffer, &len)) 
+		{
+			if (buffer[0] == msg_count) {
+				tmp_bitfield = (uint32_t)*(&buffer[1]);
+				bitfield_1 |= tmp_bitfield;
+			}
 		}
 	}
+	
+	/* shut the radio down */
+    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 }
 
 static void waitSync()
@@ -233,21 +223,14 @@ static void waitSync()
 	 * When the message is received start the RTC to sync to the Nw and break 
 	 * the loop */
     bool exitLoop = false;
-	while (1) 
+	while (!exitLoop) 
 	{
-		/* stay in receive mode for a while */
-		NWK_DELAY(50);
-	
-		/* we might have received multiple messages, iterate over the receive buffer
-		 * to make sure all messages are being processed */
-		while (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, buffer, &len)) 
+		if (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, buffer, &len)) 
 		{
 			BSP_TURN_ON_LED1();
 			if (buffer[0] == msg_sync) {
-				// sync message from network received -> start the RTC 
-				
+				/* sync message from network received -> start the algorithm */ 
 				exitLoop = true;
-				break;
 			}
 		}
 		
@@ -318,3 +301,16 @@ void setActivePeriod(uint32_t period)
 	T1CTL |= (1<<1);	
 }
 	
+__interrupt void timer1IR(void){
+	static uint32_t ofCnt = 0;
+	ofCnt++;
+	
+	/* check if the active period has expired */
+	if (ofCnt >= activePeriodOfLimit) 
+	{
+		activePeriod = false;
+		ofCnt = 0;
+		/* stop the timer */
+		T1CTL &= !(1<<1);
+	}
+}
