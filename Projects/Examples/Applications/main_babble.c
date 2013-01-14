@@ -212,8 +212,13 @@ static void listenBitfield()
 			if (buffer[0] == msg_count) {
 				tmp_bitfield = (uint32_t)*(&buffer[1]);
 				bitfieldA |= tmp_bitfield;
+			/* if a collect message is received, check if it's addressed to this 
+		     * network node. Transmit the stored bitfields if it is */
 			} else if (buffer[0] == msg_collect) {
-				transmitBitfields();
+				tmp_bitfield = (uint32_t)*(&buffer[1]);
+				uint32_t cmp_bitfield = (1 << UNIQUE_ID);
+				if (tmp_bitfield == cmp_bitfield)
+					transmitBitfields();
 			}
 		}
 	}
