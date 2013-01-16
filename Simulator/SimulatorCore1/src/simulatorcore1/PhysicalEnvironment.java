@@ -7,7 +7,7 @@ import java.util.Iterator;
  *
  * @author maltanar
  */
-public class PhysicalEnvironment implements SimulationItem
+public class PhysicalEnvironment implements SimulationItem, RadioInterface
 {
     private HashMap<Integer, SensorNode> m_sensorNodes;
     private int m_width, m_height;
@@ -46,7 +46,7 @@ public class PhysicalEnvironment implements SimulationItem
         // create a new node with randomized location 
         SensorNode newNode = new SensorNode(newNodeID, 
                                             generateRandomPosition(),
-                                            cfg, getMaxNetworkSize());
+                                            cfg, this, getMaxNetworkSize());
         // add the new node to our list
         m_sensorNodes.put(newNodeID, newNode);
         
@@ -124,10 +124,11 @@ public class PhysicalEnvironment implements SimulationItem
         while(nodes.hasNext())
         {
             SensorNode node = nodes.next();
-            // TODO maybe only attempt to propagate broadcast to other nodes?
-            // theoretically a node could receive its own broadcast if it 
-            // started listening right after sending and there were some 
-            // reflected waves coming...
+            
+            // only attempt to propagate broadcast to other nodes
+            if(node == origin)
+                continue;
+            
             // calculate distance in meters
             distance = calculateDistance(origin, node);
             // use Friis equation to calculate rx power on the destination node
