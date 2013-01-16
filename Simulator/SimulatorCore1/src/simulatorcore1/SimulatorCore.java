@@ -77,27 +77,16 @@ public class SimulatorCore
                                         newNode);
         }
         
-        simulator.passTime(500);
+        environment.makeSyncBroadcast();
         
-        SensorNode coordNode = environment.createNode();
-
-        // simulate the sync message
-        environment.propagateRadioWaves("0000", coordNode, -0.4);
+        for(int i=0; i < 100; i++)
+           simulator.passTime(100);
         
-        
-        simulator.passTime(500);
-        simulator.passTime(500);
-        simulator.passTime(500);
-        simulator.passTime(500);
-        simulator.passTime(500);
-        simulator.passTime(500);
-        simulator.passTime(500);
-        simulator.passTime(500);
-        simulator.passTime(500);
-        simulator.passTime(500);
-        simulator.passTime(500);
-        
-                
+        for (int i =1; i <= N; i++)
+        {
+            System.out.printf("%d : %s \n", i,
+            environment.getNode(i).getPresenceData().toString());
+        }
         
         //environment.createNode();
         //environment.createNode();

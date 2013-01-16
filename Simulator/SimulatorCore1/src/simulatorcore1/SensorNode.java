@@ -92,9 +92,9 @@ public class SensorNode implements SimulationItem {
     public void moveBy(SensorPosition movementDelta) {
         this.m_position.move(movementDelta);
     }
-    
-    public String getPresenceData(){
-        return  m_presenceData.toString();
+
+    public String getPresenceData() {
+        return m_presenceData.toString();
     }
 
     // returns the current current consumption estimate by this node in mA
@@ -146,6 +146,8 @@ public class SensorNode implements SimulationItem {
 
         // cannot receive message if signal is too weak
         if (rxPower < m_config.rxSensitivitydBm) {
+            System.out.printf("Node %d dropped %s \n", m_nodeID, data);
+            System.out.printf("RX power: %f \n", rxPower);
             return;
         }
 
@@ -153,8 +155,6 @@ public class SensorNode implements SimulationItem {
         // TODO here would be a good place to implement dropping messages
         // if they are coming in too quickly
         m_rfMessageQueueRx.add(data);
-
-        System.out.printf("Node %d received %s \n", m_nodeID, data);
     }
 
     public void sendRadioWaves(String data) {
@@ -190,10 +190,9 @@ public class SensorNode implements SimulationItem {
             return "";
         }
     }
-    
+
     // return the records of all accumulated presence data 
-    public LinkedList<PresenceData> getPresenceDataHistory()
-    {
+    public LinkedList<PresenceData> getPresenceDataHistory() {
         return m_presenceDataHistory;
     }
 
@@ -208,21 +207,7 @@ public class SensorNode implements SimulationItem {
                 m_isTxActive = false;
 
                 if (waitForSyncMessage()) {
-                    // transition from init to sleep state
-                    m_state = SensorState.STATE_CYCLE_SLEEP;
-                    m_isRxActive = false;
-                    m_isTxActive = false;
-                    newTime = 0;
-                    System.out.printf("Node %d is now sleeping \n", m_nodeID);
-                }
-                break;
-
-            case STATE_CYCLE_SLEEP:
-                m_isRxActive = false;
-                m_isTxActive = false;
-
-                if (newTime >= m_config.sleepDurationS * 1000) {
-                    // transition from sleep to active state
+                    // transition from init to active state
                     m_state = SensorState.STATE_CYCLE_ACTIVE;
                     // initialize local presence data to all zeroes except
                     // our own node ID
@@ -235,9 +220,43 @@ public class SensorNode implements SimulationItem {
                     // timecounter will be used internally to switch between
                     // tx and rx modes
                     newTime = 0;
+                    // rx and tx need to be enabled before next sim cycle
+                    // otherwise we may drop messages
+                    m_isRxActive = !isMyTurnToSend();
+                    m_isTxActive = isMyTurnToSend();
                     System.out.printf("Node %d is now active \n", m_nodeID);
                 }
+                break;
 
+            case STATE_CYCLE_SLEEP:
+                m_isRxActive = false;
+                m_isTxActive = false;
+
+                if (newTime >= m_config.sleepDurationS * 1000) {
+                    // transition from sleep to active state
+                    m_state = SensorState.STATE_CYCLE_ACTIVE;
+                    // initialize local presence data to all zeroes and generate
+                    // the sync signal
+                    m_presenceData.resetAll();
+                    m_isTxActive = true;
+                    sendRadioWaves(m_presenceData.toString());
+                    m_isTxActive = false;
+                    // set own presence to 1
+                    m_presenceData.setPresence(m_nodeID);
+                    ;
+                    m_sentDataInCycle = false;
+                    // reset the cycle counter every time we start a new cycle
+                    // set, i.e after waking up from sleep
+                    m_cycleCounter = 0;
+                    // rx and tx need to be enabled before next sim cycle
+                    // otherwise we may drop messages
+                    m_isRxActive = !isMyTurnToSend();
+                    m_isTxActive = isMyTurnToSend();
+                    // timecounter will be used internally to switch between
+                    // tx and rx modes
+                    newTime = 0;
+                    System.out.printf("Node %d is now active \n", m_nodeID);
+                }
 
                 break;
 
@@ -249,8 +268,8 @@ public class SensorNode implements SimulationItem {
                     m_isTxActive = true;
 
                     if (!m_sentDataInCycle) {
-                        System.out.printf("Node %d tx %s \n", m_nodeID,
-                                m_presenceData.toString());
+                        System.out.printf("Node %d tx %s cc %d \n", m_nodeID,
+                                m_presenceData.toString(), m_cycleCounter);
                         sendRadioWaves(m_presenceData.toString());
                         m_sentDataInCycle = true;
                     }
@@ -275,11 +294,12 @@ public class SensorNode implements SimulationItem {
                             newData.fromString(received);
                             // combine with local presence data
                             m_presenceData.combineWith(newData);
-                            
-                            System.out.printf("Node %d received %s new data %s \n",
+
+                            System.out.printf("Node %d received %s new data %s cc %d \n",
                                     m_nodeID,
                                     received,
-                                    m_presenceData.toString());
+                                    m_presenceData.toString(),
+                                    m_cycleCounter);
                         }
                     } while (!received.isEmpty());
                     // check to see if we have completed the current rx cycle
@@ -290,7 +310,7 @@ public class SensorNode implements SimulationItem {
                 }
 
                 // when we have gone through the tx-rx cycles the desired num
-                // of times, go back to sleep
+                // of times, go back to sleep   
                 if (m_cycleCounter == m_config.cycleCount) {
                     // save the accumulated presence data to archive
                     m_presenceDataHistory.add(m_presenceData);
@@ -309,13 +329,19 @@ public class SensorNode implements SimulationItem {
     protected boolean waitForSyncMessage() {
         // to keep the local clock synchronized with the rest of the network,
         // the node will wait until it hears a broadcast to go into active mode
-        if (!getFromRxQueue().equals("")) // nonempty value = broadcast rcvd
-        {
-            System.out.printf("Node %d got sync mssage \n", m_nodeID);
-            return true;
-        } else {
-            return false;   // no broadcast, keep waiting
+
+        // if we receive a presence data field equivalent to all zeroes,
+        // that's our sync message!
+        m_presenceData.resetAll();
+
+        while (!m_rfMessageQueueRx.isEmpty()) {
+            if (getFromRxQueue().equals(m_presenceData.toString())) {
+                System.out.printf("Node %d got sync mssage \n", m_nodeID);
+                return true;
+            }
         }
+
+        return false;   // no sync broadcast, keep waiting
     }
 
     protected boolean isMyTurnToSend() {
