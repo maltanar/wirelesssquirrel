@@ -32,7 +32,7 @@ public class PresenceData
     {
         // use logical OR to combine local and remote presence fields
         for(int i = 0; i < m_size; i++)
-            m_presenceFlags[i] = m_presenceFlags[i] || data.getPresence(i);
+            m_presenceFlags[i] |= data.getPresence(i+1);
     }
     
     public Boolean getPresence(int nodeID)
@@ -42,7 +42,7 @@ public class PresenceData
     
     public void setPresence(int nodeID)
     {
-        m_presenceFlags[nodeID] = Boolean.TRUE;
+        m_presenceFlags[nodeID - 1] = Boolean.TRUE; // nodeID starts from 1
     }
     
     // helper function - set all presence fields to 0
