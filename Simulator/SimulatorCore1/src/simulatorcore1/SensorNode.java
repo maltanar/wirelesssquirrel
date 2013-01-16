@@ -85,6 +85,10 @@ public class SensorNode implements SimulationItem {
     public void moveBy(SensorPosition movementDelta) {
         this.m_position.move(movementDelta);
     }
+    
+    public String getPresenceData(){
+        return  m_presenceData.toString();
+    }
 
     // returns the current current consumption estimate by this node in mA
     // this depends on the current state (sleeping, transmitting, etc.)

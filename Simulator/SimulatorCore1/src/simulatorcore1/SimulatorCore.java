@@ -7,11 +7,11 @@ import java.util.LinkedList;
 import java.util.Scanner;
 import java.util.Set;
 
-
 /**
  *
  * @author maltanar
  */
+
 public class SimulatorCore 
 {
     protected HashMap<String, SimulationItem> m_simulationItems;
@@ -127,6 +127,9 @@ public class SimulatorCore
                 System.out.println("Distance: " + "(" + Integer.toString(i) + " , " + Integer.toString(j) + ") "+ distance_array[i][j]);
             }
         }
+        
+        GUI g = new GUI();
+        g.repaint();
         
     }
     

@@ -38,8 +38,17 @@ public class SensorDisplay extends JPanel {
         for (int i = 0; i < SN.size(); i++) {
             NodeDisplay sensor = new NodeDisplay();
             sensor.setLocation(SN.get(i).getPosition().x, SN.get(i).getPosition().y);
-            sensor.setSize(10, 10);
+            sensor.setSize(50, 30);
             sensor.setSensorNode(SN.get(i));
+            
+            // Dosplay the node id
+            Integer sensorID = SN.get(i).getNodeID();
+            String colon = " : "; // Not colon sausage!
+            String bitfield = SN.get(i).getPresenceData();
+            
+            String displayData = sensorID.toString() + colon + bitfield;
+            
+            sensor.setText(displayData);
 
             
             if((i+1) % 2 ==0)

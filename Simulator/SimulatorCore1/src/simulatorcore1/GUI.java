@@ -23,13 +23,14 @@ import javax.swing.SwingConstants;
  */
 public class GUI extends JFrame {
 
-    private JButton showBtn;
+    private JButton createBtn;
     private JButton clearBtn;
-    private JButton runBtn;
+    private JButton updateBtn;
     private SensorDisplay displayPanel;
     private JTextField size;
     private JLabel lblNumber;
     private List<SensorNode> nodeList = new LinkedList<SensorNode>();
+    private PhysicalEnvironment environment;
 
     public GUI() {
         // SET WINDOW PROPERTIES
@@ -38,6 +39,9 @@ public class GUI extends JFrame {
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.setVisible(true);
         getContentPane().setLayout(null);
+        
+        // Initialise the physical environment
+        environment = new PhysicalEnvironment(350, 350, 4);
 
         // add sensor display panel
         displayPanel = new SensorDisplay(1, 1, 500, 500);
@@ -52,17 +56,17 @@ public class GUI extends JFrame {
         getContentPane().add(size);
 
         // add control components: Show sensor button
-        showBtn = new JButton("Show");
-        showBtn.setSize(100, 30);
-        showBtn.setLocation(600, 80);
-        showBtn.addActionListener(new ActionListener() {
+        createBtn = new JButton("Create");
+        createBtn.setSize(100, 30);
+        createBtn.setLocation(600, 80);
+        createBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 // call run method
                 showSensors();
             }
         });
-        getContentPane().add(showBtn);
+        getContentPane().add(createBtn);
         
         // add label: enter the number of sensor nodes
         lblNumber = new JLabel("Enter the number of nodes simulated");
@@ -83,38 +87,37 @@ public class GUI extends JFrame {
         getContentPane().add(clearBtn);
         
         // add control components: run simulation button
-        runBtn  = new JButton("run");
-        runBtn.setLocation(600, 150);
-        runBtn.setSize(100, 30);
-        runBtn.addActionListener(new ActionListener() {
+        updateBtn  = new JButton("Update");
+        updateBtn.setLocation(600, 150);
+        updateBtn.setSize(100, 30);
+        updateBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                runSimulation();
+                addNode();
             }
             
         });
-        getContentPane().add(runBtn);
+        getContentPane().add(updateBtn);
     }
 
     // Method showSensors: show the simulated sensors on the screen based on the value user entered
     public void showSensors() {
-        clearScreen();
+        //clearScreen();
         // get number of nodes entered by the user
         int nodesNumber = Integer.parseInt(size.getText());
-
-        PhysicalEnvironment environment = new PhysicalEnvironment(350, 350, 4);
+        
         System.out.println("Node count: "
                 + Integer.toString(environment.getNodeCount()));
 
         // Create N nodes according to the number user entered
         for (int i = 1; i <= nodesNumber; i++) {
-            environment.createNode();
+            nodeList.add(environment.createNode());
         }
 
         // populate the nodeList for later call
-        for (int i = 1; i <= nodesNumber; i++) {
-            nodeList.add(environment.getNode(i));
-        }
+        //for (int i = 1; i <= nodesNumber; i++) {
+         //   nodeList.add(environment.getNode(i));
+        //}
 
         displayPanel.paintSensor(nodeList);
 
@@ -151,7 +154,9 @@ public class GUI extends JFrame {
         this.repaint();
     }
     
-    public void runSimulation(){
-        // run the simulation, to be designed later
+    public void addNode(){
+        // Add one node
+        nodeList.add(environment.createNode());
+        displayPanel.paintSensor(nodeList);
     }
 }
