@@ -16,6 +16,11 @@ import javax.swing.JPanel;
 public class NodeDisplay extends JButton {
     private boolean pressed = false;
     private int oldX, oldY;
+    private SensorNode m_node;
+    
+    public void setSensorNode(SensorNode node) {
+        m_node = node;
+    }
     
     @Override
     protected void processMouseEvent(MouseEvent e)
@@ -27,7 +32,13 @@ public class NodeDisplay extends JButton {
             oldY = e.getYOnScreen();
         }
         else
+        {
             pressed = false;
+            SensorPosition newPosition = new SensorPosition();
+            newPosition.x = this.getLocation().x;
+            newPosition.y = this.getLocation().y;
+            m_node.setPosition(newPosition);
+        }
     }
     
     @Override

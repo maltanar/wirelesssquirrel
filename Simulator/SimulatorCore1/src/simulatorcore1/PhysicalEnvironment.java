@@ -13,21 +13,21 @@ public class PhysicalEnvironment implements SimulationItem
     private int m_width, m_height;
     private int m_maxNetworkSize;
     
-    public PhysicalEnvironment(int width, int height)
+    public PhysicalEnvironment(int width, int height, int maxNetworkSize)
     {
         m_sensorNodes = new HashMap<Integer, SensorNode>();
         m_width = width;
         m_height = height;
-        m_maxNetworkSize = 255;
+        m_maxNetworkSize = maxNetworkSize;
     }
     
-    public int createNode()
+    public SensorNode createNode()
     {
         if(getNodeCount() >= m_maxNetworkSize)
         {
             System.out.printf("PhysicalEnvironment: Allowed node count exceeded!"
                                + " (%d) \n", m_maxNetworkSize);
-            return 0;
+            return null;
         }
         // new node ID is next available integer ID
         Integer newNodeID = m_sensorNodes.size() + 1;
@@ -37,6 +37,7 @@ public class PhysicalEnvironment implements SimulationItem
         SensorConfig cfg = new SensorConfig();
         cfg.arbitrationMode = SensorConfig.ArbitrationMode.ARBITRATE_ODDEVEN;
         cfg.cycleCount = 3;
+        cfg.sleepDurationS = 1;
         cfg.rxDurationMs = 1000;
         cfg.txDurationMs = 1000;
         cfg.txPowerdBm = -0.4;         // suggested value from CC2430 datasheet
@@ -49,7 +50,7 @@ public class PhysicalEnvironment implements SimulationItem
         // add the new node to our list
         m_sensorNodes.put(newNodeID, newNode);
         
-        return newNodeID;
+        return newNode;
     }
     
     // return number of present nodes in the environment

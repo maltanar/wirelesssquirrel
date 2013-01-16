@@ -102,7 +102,7 @@ public class GUI extends JFrame {
         // get number of nodes entered by the user
         int nodesNumber = Integer.parseInt(size.getText());
 
-        PhysicalEnvironment environment = new PhysicalEnvironment(350, 350);
+        PhysicalEnvironment environment = new PhysicalEnvironment(350, 350, 4);
         System.out.println("Node count: "
                 + Integer.toString(environment.getNodeCount()));
 

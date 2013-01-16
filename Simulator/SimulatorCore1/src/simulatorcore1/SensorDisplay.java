@@ -39,6 +39,7 @@ public class SensorDisplay extends JPanel {
             NodeDisplay sensor = new NodeDisplay();
             sensor.setLocation(SN.get(i).getPosition().x, SN.get(i).getPosition().y);
             sensor.setSize(10, 10);
+            sensor.setSensorNode(SN.get(i));
 
             
             if((i+1) % 2 ==0)
