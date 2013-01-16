@@ -63,7 +63,7 @@ public class GUI extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
                 // call run method
-                showSensors();
+                createSensors();
             }
         });
         getContentPane().add(createBtn);
@@ -101,7 +101,7 @@ public class GUI extends JFrame {
     }
 
     // Method showSensors: show the simulated sensors on the screen based on the value user entered
-    public void showSensors() {
+    public void createSensors() {
         //clearScreen();
         // get number of nodes entered by the user
         int nodesNumber = Integer.parseInt(size.getText());
@@ -157,6 +157,6 @@ public class GUI extends JFrame {
     public void addNode(){
         // Add one node
         nodeList.add(environment.createNode());
-        displayPanel.paintSensor(nodeList);
+        displayPanel.addSensor(nodeList.get(nodeList.size() - 1));
     }
 }
