@@ -97,7 +97,7 @@ public class SimulatorCore
         simulator.passTime(500);
         simulator.passTime(500);
         
-                
+       
         
         //environment.createNode();
         //environment.createNode();

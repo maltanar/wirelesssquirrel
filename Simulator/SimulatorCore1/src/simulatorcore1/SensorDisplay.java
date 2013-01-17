@@ -37,7 +37,7 @@ public class SensorDisplay extends JPanel {
         for (int i = 0; i < SN.size(); i++) {
             NodeDisplay sensor = new NodeDisplay();
             sensor.setLocation(SN.get(i).getPosition().x, SN.get(i).getPosition().y);
-            sensor.setSize(50, 30);
+            sensor.setSize(80, 30);
             sensor.setSensorNode(SN.get(i));
 
             // Display the node id
@@ -66,33 +66,5 @@ public class SensorDisplay extends JPanel {
         this.repaint();
     }
 
-    public void addSensor(SensorNode node) {
-        NodeDisplay sensor = new NodeDisplay();
-        sensor.setLocation(node.getPosition().x, node.getPosition().y);
-        sensor.setSize(50, 30);
-        sensor.setSensorNode(node);
-
-        // Display the node id
-        Integer sensorID = node.getNodeID();
-        String colon = " : ";
-        String bitfield = node.getPresenceData();
-
-        String displayData = sensorID.toString() + colon + bitfield;
-
-        sensor.setText(displayData);
-
-        if (sensorID % 2 == 0) {
-            sensor.setBackground(Color.RED);// Even node
-        } else {
-            sensor.setBackground(Color.BLUE);// Odd node
-        }
-
-        sensor.setBorder(blackline);
-        sensors.add(sensor);
-        
-        this.add(sensor);
-        
-        this.repaint();
-
-    }
+    
 }

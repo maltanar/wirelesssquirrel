@@ -11,6 +11,7 @@ import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Scanner;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -25,12 +26,11 @@ public class GUI extends JFrame {
 
     private JButton createBtn;
     private JButton clearBtn;
-    private JButton updateBtn;
+    private JButton runBtn;
     private SensorDisplay displayPanel;
     private JTextField size;
     private JLabel lblNumber;
     private List<SensorNode> nodeList = new LinkedList<SensorNode>();
-    private PhysicalEnvironment environment;
 
     public GUI() {
         // SET WINDOW PROPERTIES
@@ -41,7 +41,7 @@ public class GUI extends JFrame {
         getContentPane().setLayout(null);
         
         // Initialise the physical environment
-        environment = new PhysicalEnvironment(350, 350, 4);
+        
 
         // add sensor display panel
         displayPanel = new SensorDisplay(1, 1, 500, 500);
@@ -87,24 +87,72 @@ public class GUI extends JFrame {
         getContentPane().add(clearBtn);
         
         // add control components: run simulation button
-        updateBtn  = new JButton("Update");
-        updateBtn.setLocation(600, 150);
-        updateBtn.setSize(100, 30);
-        updateBtn.addActionListener(new ActionListener() {
+        runBtn  = new JButton("Run");
+        runBtn.setLocation(600, 150);
+        runBtn.setSize(100, 30);
+        runBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                addNode();
+                runAndUpdate();
             }
             
         });
-        getContentPane().add(updateBtn);
+        getContentPane().add(runBtn);
     }
 
     // Method showSensors: show the simulated sensors on the screen based on the value user entered
     public void createSensors() {
         //clearScreen();
         // get number of nodes entered by the user
+        
+        PhysicalEnvironment environment = new PhysicalEnvironment(100, 100, 4);
+        SimulatorCore simulator = new SimulatorCore();
+        
+        // enter the number of sensor to be simulated 
+        //System.out.println("Please enter the number of nodes to be simulated: ");
+        //System.out.println("note: only integer valid");
+        
+        //Scanner input = new Scanner(System.in);
+        
+        //int N = input.nextInt(); // number of nodes to be simulated
+        
+        // Create N nodes according to the number user entered and add them
+        // to the simulation
+        
         int nodesNumber = Integer.parseInt(size.getText());
+        
+        for (int i =1; i <= nodesNumber; i++)
+        {
+            SensorNode newNode = environment.createNode();
+            if(newNode != null)
+                simulator.addSimulationItem(Integer.toString(newNode.getNodeID()),
+                                        newNode);
+        }
+        
+        simulator.passTime(500);
+        
+        SensorNode coordNode = environment.createNode();
+
+        // simulate the sync message
+        environment.propagateRadioWaves("0000", coordNode, -0.4);
+        
+        
+        simulator.passTime(500);
+        simulator.passTime(500);
+        simulator.passTime(500);
+        simulator.passTime(500);
+        simulator.passTime(500);
+        simulator.passTime(500);
+        simulator.passTime(500);
+        simulator.passTime(500);
+        simulator.passTime(500);
+        simulator.passTime(500);
+        simulator.passTime(500);
+        
+                
+        
+        //environment.createNode();
+        //environment.createNode();
         
         System.out.println("Node count: "
                 + Integer.toString(environment.getNodeCount()));
@@ -154,9 +202,8 @@ public class GUI extends JFrame {
         this.repaint();
     }
     
-    public void addNode(){
-        // Add one node
-        nodeList.add(environment.createNode());
-        displayPanel.addSensor(nodeList.get(nodeList.size() - 1));
+    public void runAndUpdate(){
+        // run the simulation and update the bit field
+        
     }
 }
