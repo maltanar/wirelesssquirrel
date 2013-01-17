@@ -100,12 +100,17 @@ static void initSleepTimer(void);
 static void exitSleepTimer(void);
 static void sleepPm2(uint32_t seconds);
 static void printBitfield(uint32_t *bf);
+static void initUart(void);
+static void txUart(char);
 
 void main (void)
 {
 	/* initialize the board hardware */
 	BSP_Init();
 
+	/* Initialise the UART */
+	initUart();
+	
 	/* Assign a unique address to the radio device, based on the the unique NW id.
 	 * The first three bytes can be selected arbitrarlily */
 	addr_t lAddr = {{0x71, 0x56, 0x34, UNIQUE_ID}};
@@ -141,7 +146,13 @@ static void gatherAlgorithm()
 		
 	
 		/* print the result of the gather operation */
-		printBitfield(&bitfieldA);
+		//printBitfield(&bitfieldA);
+		
+		// Test transmit TEST over UART
+		txUart(0x54);
+		txUart(0x45);
+		txUart(0x53);
+		txUart(0x54);
 		
 		/* store the bitfield in a list in memory */
 		storeBitfield(&bitfieldA);
@@ -352,6 +363,31 @@ static void sleepPm2(uint32_t seconds)
 		IRCON = ircon_prev;
 		IEN0 = ien_prev;
 	}
+}
+
+/* Initialise parameters for Uart transmission */
+void initUart()
+{
+	// Set Baud rate to 9600bps
+	U0BAUD = 0x59;
+	U0GCR |= 0x08;
+	
+	// Set UART mode and disable receiver
+	U0CSR = (U0CSR | 0x80) & ~0x40;
+	
+	// Select correct I/O pins. Use alternative 1 from datasheet 13.4.6.4
+	PERCFG &= ~0xFE;
+	P0SEL = 0x3C; 
+		
+}
+
+void txUart(char testByte)
+{
+	// Load bitfield into tx register
+	U0DBUF = testByte;
+	
+	// Wait while byte is transmitted
+	while(U0CSR & 0x01);
 }
 
 /* function for setting the global "activePeriod" variable to true after n * 100 ms have passed */
