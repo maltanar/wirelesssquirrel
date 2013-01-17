@@ -45,13 +45,14 @@
 #include "string.h"
 
 /* unique ID for this network node, also used to decide the order of the algorithm steps */
-#define UNIQUE_ID 0x00
-/* number of iterations of the (broadcast-listen) or (listen-broadcast) loop */
+#define UNIQUE_ID 0xFE
+/* number of iterations of the listen-broadcast loop */
 #define BROADCAST_ITERATIONS 4
 /* radio active period during broadcast and listen step (in multiples of 10ms)*/
 #define RADIO_PERIOD 50
-/* sleep period between broadcasting cycles (in seconds) */
-#define SLEEP_PERIOD 10
+/* sleep period between broadcasting cycles (in seconds)
+ * ! has to be 1-2 seconds shorter than for the broacasting nodes */
+#define SLEEP_PERIOD 8
 /* set the number of bitfields to keep in memory */
 #define BITFIELD_MEMORY 10
 
@@ -90,17 +91,15 @@ __xdata static uint8_t bfIdx = 0;
 __interrupt void timer1IR(void);
 
 /* function prototypes */
-static void countingAlgorithm(bool joinNetwork);
-static void broadcastBitfield(void);
+static void gatherAlgorithm(void);
 static void listenBitfield(void);
-static void broadcastSync(void);
 static bool waitSync(void);
 static void storeBitfield(const uint32_t *bitfield);
-static void transmitBitfields(void);
 static void setActivePeriod(uint32_t timeoutX100ms);
 static void initSleepTimer(void);
 static void exitSleepTimer(void);
 static void sleepPm2(uint32_t seconds);
+static void printBitfield(uint32_t *bf);
 
 void main (void)
 {
@@ -117,44 +116,32 @@ void main (void)
 	 * we supply a callback pointer to handle the message returned by the peer */
 	SMPL_Init(0);
 		
-	/* wait for a sync message or a button press to start the algorithm ... */
-	countingAlgorithm(waitSync());
+	/* start the gather algorithm ... */
+	gatherAlgorithm();
 }
 
-/* realizes the counting algorithm for the low energy mesh-network architecture
- * In: joinNetwork - if the node joins an existing network the first broadcast of
- * 					the sync message will be skipped */
-static void countingAlgorithm(bool joinNetwork)
+/* realizes the gather algorithm for the low energy mesh-network architecture */
+static void gatherAlgorithm()
 {
 	while (1)
 	{ 
-		/* broadcast that a new algorithm iteration starts, to allow new nodes
-		 * to join in. Nodes that join for the first time will skip this call */
-		if (!joinNetwork) 
-			broadcastSync();
-		joinNetwork = false;
+		/* wait for a Synchronization message from the network to sync in */
+		waitSync();
 		
-		/* start with listening / broadcasting depending on the unique id */
-		if (UNIQUE_ID % 2 == 0)
+		/* reset the stored bitfield and listen listen to the new broadcasts to
+		 * collect build the current bitfield.
+		 * To be able to use the same defines as for the broadcast nodes, use the
+		 * same loop */
+		bitfieldA = 0;
+		for (uint8_t i = 0; i < BROADCAST_ITERATIONS; i++)
 		{
-			for (uint8_t i = 0; i < BROADCAST_ITERATIONS; i++)
-			{
-				BSP_TURN_ON_LED1();
-				broadcastBitfield();
-				BSP_TURN_OFF_LED1();
-				listenBitfield();
-			}
-		} 
-		else
-		{
-			for (uint8_t i = 0; i < BROADCAST_ITERATIONS; i++) 
-			{
-				BSP_TURN_OFF_LED1();
-				listenBitfield();
-				BSP_TURN_ON_LED1();
-				broadcastBitfield();
-			}
+			listenBitfield();
+			listenBitfield();
 		}
+		
+	
+		/* print the result of the gather operation */
+		printBitfield(&bitfieldA);
 		
 		/* store the bitfield in a list in memory */
 		storeBitfield(&bitfieldA);
@@ -163,40 +150,6 @@ static void countingAlgorithm(bool joinNetwork)
 		BSP_TURN_OFF_LED1();
 		sleepPm2(SLEEP_PERIOD);
 	}
-}
-
-static void broadcastBitfield()
-{
-	/* wake up radio. */
-	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
-	
-	/* set the own bit in the bitfield */
-	bitfieldA |= 1 << UNIQUE_ID;
-	
-	/* copy the current bitfield into the transmit buffer */
-	memset(buffer, 0, sizeof(buffer));
-	buffer[0] = msg_count;
-	memcpy(&buffer[1], &bitfieldA, sizeof(bitfieldA));
-	
-	/* broadcast the current bitfield one single time, then shutdown the radio
-	 * and wait for the transmit period to expire */
-	bool bcast_sent = false;
-	setActivePeriod(RADIO_PERIOD);
-	while (activePeriod)
-	{
-		if (!bcast_sent)
-		{
-			SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer));
-			bcast_sent = true;
-			/* shut the radio down early as possible to save energy */
-			SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
-		}
-	}
-
-	/* fixed delay after active period for simulating shutting down the radio
-	 * to keep duration of listenBitfield() and broadcastBitfield() equal */
-	setActivePeriod(1);
-    while(activePeriod);
 }
 
 static void listenBitfield()
@@ -220,38 +173,19 @@ static void listenBitfield()
 		while (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, buffer, &len)) 
 		{
 			if (buffer[0] == msg_count) {
+				BSP_TOGGLE_LED1();
 				tmp_bitfield = (uint32_t)*(&buffer[1]);
 				bitfieldA |= tmp_bitfield;
-			/* if a collect message is received, check if it's addressed to this 
-		     * network node. Transmit the stored bitfields if it is */
-			} else if (buffer[0] == msg_collect) {
-				tmp_bitfield = (uint32_t)*(&buffer[1]);
-				uint32_t cmp_bitfield = (1 << UNIQUE_ID);
-				if (tmp_bitfield == cmp_bitfield)
-					transmitBitfields();
 			}
 		}
 	}
-	
-	/* fixed delay after active period for shutting down the radio to keep 
-	 * duration of listenBitfield() and broadcastBitfield() equal */
-	setActivePeriod(1);
-	bool radioShutDown = false;
-    while(activePeriod) 
-	{
-		/* shut the radio down */
-		if (!radioShutDown) 
-		{
-			SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
-			radioShutDown = true;
-		}
-	}
+	/* shut down the radio */
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 }
 
 /* enables the receiver and waits for a sync message from the network or a button
  * press. If a button press is detected, the node will start it's own network 
- * Return: true - if sync message was received
- * 		   false - if button press was detected */
+ * Return: true - if sync message was received */
 static bool waitSync()
 {
 	uint8_t len = 0;
@@ -278,12 +212,6 @@ static bool waitSync()
 				exitLoop = true;
 			}
 		}
-		
-		/* check if the user pressed the "start network" button */
-		if (exitLoop || BSP_BUTTON1()) 
-		{
-			break;
-		}
 	}
 	
 	/* shut the radio down */
@@ -292,21 +220,8 @@ static bool waitSync()
 	return syncMessageReceived;
 }
 
-/* broadcasts a message of the syncronization type */
-static void broadcastSync()
+static void printBitfield(uint32_t *bf)
 {
-	/* wake up radio. */
-	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
-	
-	/* create a sync message in the transmit buffer */
-	memset(buffer, 0, sizeof(buffer));
-	buffer[0] = msg_sync;
-	
-	/* broadcast the sync message (only transmit the message type byte of the msg) */
-	SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(uint8_t));
-
-	/* shut the radio down */
-	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 }
 
 /* function to store the current bitfield in a memory location that's not lost
@@ -325,28 +240,6 @@ void storeBitfield(const uint32_t *bitfield)
 	} else
 	{
 		bitfieldMemory[bfIdx++] = *bitfield;
-	}
-}
-
-/* opens up a link for a data-collection device to connect to, if the connection
- * is established, the stored bitfields are sent out. If no connection is established
- * after a period of time, the function returns and the device enters the sleep mode
- * again */
-void transmitBitfields(void)
-{
-	/* open up a link for the data-collection device, by default this function
-	 * waits for 5 seconds, use LINKLISTEN_MILLISECONDS_2_WAIT (nwk_api.c) to modify */
-	linkID_t linkID;
-	if (SMPL_TIMEOUT == SMPL_LinkListen(&linkID))
-		/* return early if no connection is established within the timelimit */
-		return;
-	
-	/* transmit all stored bitfields to the data-collection device */
-	for (uint8_t i = 0; i < bfIdx; i++)
-	{
-		if (SMPL_SUCCESS != SMPL_Send(linkID, (uint8_t*)&bitfieldMemory[i], sizeof(bitfieldMemory[0])))
-			/* transmission failed, end transmission */
-			break;
 	}
 }
 

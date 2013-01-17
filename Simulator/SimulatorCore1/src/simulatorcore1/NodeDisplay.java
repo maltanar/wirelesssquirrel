@@ -14,25 +14,34 @@ import javax.swing.JPanel;
  * @author GeorgeSong
  */
 public class NodeDisplay extends JButton {
+
     private boolean pressed = false;
     private int oldX, oldY;
     private SensorNode m_node;
-    
-    public void setSensorNode(SensorNode node) {
-        m_node = node;
+
+    public NodeDisplay(SensorNode attachedNode) {
+        m_node = attachedNode;
+        updateData();
     }
-    
+
+    public void updateData() {
+        // update content of GUI element from simulated SensorNode
+        String newText = "ID: " + m_node.getNodeID();
+        newText += " Flags: " + m_node.getPresenceData().toString();
+        this.setText(newText);
+        // synchronize position
+        this.setLocation(m_node.getPosition().x, m_node.getPosition().y);
+        this.setSize(300, 50);
+    }
+
     @Override
-    protected void processMouseEvent(MouseEvent e)
-    {
-        if(e.getButton() == MouseEvent.BUTTON1) // mouse press
+    protected void processMouseEvent(MouseEvent e) {
+        if (e.getButton() == MouseEvent.BUTTON1) // mouse press
         {
             pressed = true;
             oldX = e.getXOnScreen();
             oldY = e.getYOnScreen();
-        }
-        else
-        {
+        } else {
             pressed = false;
             SensorPosition newPosition = new SensorPosition();
             newPosition.x = this.getLocation().x;
@@ -40,23 +49,19 @@ public class NodeDisplay extends JButton {
             m_node.setPosition(newPosition);
         }
     }
-    
+
     @Override
-    protected void processMouseMotionEvent(MouseEvent e)
-    {
-        if(pressed)
-        {
+    protected void processMouseMotionEvent(MouseEvent e) {
+        if (pressed) {
             Point currentLocation = this.getLocation();
-            
-            currentLocation.translate(e.getXOnScreen() - oldX, 
+
+            currentLocation.translate(e.getXOnScreen() - oldX,
                     e.getYOnScreen() - oldY);
-            
+
             this.setLocation(currentLocation);
-                    
+
             oldX = e.getXOnScreen();
             oldY = e.getYOnScreen();
         }
     }
-            
-            
 }

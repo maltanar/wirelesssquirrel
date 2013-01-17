@@ -3197,7 +3197,7 @@
       <group>
         <name>End Device</name>
         <file>
-          <name>$PROJ_DIR$\..\..\..\Applications\main_babble.c</name>
+          <name>$PROJ_DIR$\..\..\..\Applications\data_collection.c</name>
         </file>
       </group>
     </group>
