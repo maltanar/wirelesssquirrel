@@ -49,10 +49,10 @@
 /* number of iterations of the listen-broadcast loop */
 #define BROADCAST_ITERATIONS 4
 /* radio active period during broadcast and listen step (in multiples of 10ms)*/
-#define RADIO_PERIOD 50
+#define RADIO_PERIOD 30
 /* sleep period between broadcasting cycles (in seconds)
  * ! has to be 1-2 seconds shorter than for the broacasting nodes */
-#define SLEEP_PERIOD 8
+#define SLEEP_PERIOD 6
 /* set the number of bitfields to keep in memory */
 #define BITFIELD_MEMORY 10
 
@@ -144,15 +144,8 @@ static void gatherAlgorithm()
 			listenBitfield();
 		}
 		
-	
 		/* print the result of the gather operation */
-		//printBitfield(&bitfieldA);
-		
-		// Test transmit TEST over UART
-		txUart(0x54);
-		txUart(0x45);
-		txUart(0x53);
-		txUart(0x54);
+		printBitfield(&bitfieldA);
 		
 		/* store the bitfield in a list in memory */
 		storeBitfield(&bitfieldA);
@@ -165,8 +158,6 @@ static void gatherAlgorithm()
 
 static void listenBitfield()
 {
-	BSP_TURN_OFF_LED1();
-
 	uint32_t tmp_bitfield = 0;
 	uint8_t len = 0;
 	
@@ -192,6 +183,7 @@ static void listenBitfield()
 	}
 	/* shut down the radio */
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+	BSP_TURN_OFF_LED1();
 }
 
 /* enables the receiver and waits for a sync message from the network or a button
@@ -231,8 +223,14 @@ static bool waitSync()
 	return syncMessageReceived;
 }
 
+/* prints the lowest 8 bits of the bitfield for demo purposes */
 static void printBitfield(uint32_t *bf)
 {
+	for (uint8_t i = 0; i < 8; i++)
+	{
+		printf("%c", (*bf & (1 << i))? '1' : '0');
+	}
+	printf("\n");
 }
 
 /* function to store the current bitfield in a memory location that's not lost
