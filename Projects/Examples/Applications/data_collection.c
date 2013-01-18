@@ -49,7 +49,7 @@
 /* number of iterations of the listen-broadcast loop */
 #define BROADCAST_ITERATIONS 4
 /* radio active period during broadcast and listen step (in multiples of 10ms)*/
-#define RADIO_PERIOD 30
+#define RADIO_PERIOD 50
 /* sleep period between broadcasting cycles (in seconds)
  * ! has to be 1-2 seconds shorter than for the broacasting nodes */
 #define SLEEP_PERIOD 6
@@ -92,6 +92,8 @@ __interrupt void timer1IR(void);
 
 /* function prototypes */
 static void gatherAlgorithm(void);
+static void collectAlgorithm(void);
+static bool collectFromNode(uint8_t node);
 static void listenBitfield(void);
 static bool waitSync(void);
 static void storeBitfield(const uint32_t *bitfield);
@@ -130,30 +132,150 @@ static void gatherAlgorithm()
 {
 	while (1)
 	{ 
-		/* wait for a Synchronization message from the network to sync in */
-		waitSync();
-		
-		/* reset the stored bitfield and listen listen to the new broadcasts to
-		 * collect build the current bitfield.
-		 * To be able to use the same defines as for the broadcast nodes, use the
-		 * same loop */
-		bitfieldA = 0;
-		for (uint8_t i = 0; i < BROADCAST_ITERATIONS; i++)
+		/* wait for a Synchronization message from the network to sync in, or a button
+		 * press to start gathering historic data from the nodes*/
+		if (waitSync()) 
 		{
-			listenBitfield();
-			listenBitfield();
+			/* reset the stored bitfield and listen listen to the new broadcasts to
+			 * collect build the current bitfield.
+			 * To be able to use the same defines as for the broadcast nodes, use the
+			 * same loop */
+			bitfieldA = 0;
+			for (uint8_t i = 0; i < BROADCAST_ITERATIONS; i++)
+			{
+				listenBitfield();
+				listenBitfield();
+			}
+			
+			/* print the result of the gather operation */
+			printBitfield(&bitfieldA);
+			
+			/* store the bitfield in a list in memory */
+			storeBitfield(&bitfieldA);
+		} 
+		/* user pushed a button to request collection of historic data, we still need to wait
+		 * for the sync message */
+		else 
+		{
+			collectAlgorithm();
 		}
 		
-		/* print the result of the gather operation */
-		printBitfield(&bitfieldA);
-		
-		/* store the bitfield in a list in memory */
-		storeBitfield(&bitfieldA);
-					  
 		/* send SOC to sleep */
 		BSP_TURN_OFF_LED1();
-		sleepPm2(SLEEP_PERIOD);
+		//sleepPm2(SLEEP_PERIOD);
 	}
+}
+
+/* algorithm to collect historic data from all nodes of the network */
+static void collectAlgorithm()
+{
+	/* iterate over the bitfield until all fields have been processed */	
+	while (bitfieldA != 0)
+	{
+		/* ignore button pushed and wait for sync message */
+		if (waitSync())
+		{	
+			for (uint8_t i = 0; i < 8; i++)
+			{
+				if (bitfieldA & (1 << i)) {
+					collectFromNode(i);
+					/* mark the node as precessed */
+					bitfieldA &= ~(1 << i);
+					break;
+				}
+			}
+		}
+	}
+	printf("Finished\n");
+}
+
+/* sends one collect message to the requested node, and blocks for duration of
+ * RADIO_PERIOD */
+static void collectMessage(uint8_t node)
+{
+	/* define the bitfield that signals the target node a request */
+	uint32_t collectBf = 1 << node;
+	/* copy the bitfield into the transmit buffer */
+	memset(buffer, 0, sizeof(buffer));
+	buffer[0] = msg_collect;
+	memcpy(&buffer[1], &collectBf, sizeof(collectBf));
+	
+	/* wake up radio */
+    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
+	
+	/* broadcast the data collection request */
+	bool bcast_sent = false;
+	setActivePeriod(RADIO_PERIOD);
+	while(activePeriod)
+	{
+		if (!bcast_sent) 
+		{
+			SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer));
+			bcast_sent = true;
+			/* shut the radio down early as possible to save energy */
+			SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+		}
+	}
+	/* fixed delay after active period for simulating shutting down the radio
+	 * to keep duration of listenBitfield() and broadcastBitfield() equal */
+	setActivePeriod(1);
+    while(activePeriod);
+}
+
+/* sends a 'collect_message' to the requested node and tries to establish a direct
+ * link to the node. If the link can be established, the function collects stored
+ * bitfields from the node and prints them to the terminal */
+static bool collectFromNode(uint8_t node)
+{
+	/* allocate memory space to store the received bitfields temporarly */
+	uint32_t bf[BITFIELD_MEMORY];
+	
+	/* notify the target node of the collect request, send one request during
+	 * every active radio period, to make sure the request arrives, and the duration
+	 * matches on the different nodes */
+	for (uint8_t i = 0; i < BROADCAST_ITERATIONS*2; i++)
+		collectMessage(node);
+	
+	/* wake up radio */
+    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
+	 /* turn on RX. default is RX off. */
+    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
+	
+	/* try to open up a link to the node */
+	linkID_t linkID;
+	BSP_TURN_ON_LED1();
+	if (SMPL_SUCCESS != SMPL_Link(&linkID)) 
+	{
+		BSP_TURN_OFF_LED1();
+		printf("No Link to %d\n", node);
+		/* return early if no connection is established within the timelimit */
+		SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+		return false;
+	}
+	/* receive the stored bitfields */
+	uint8_t len, idx = 0;
+	memset(buffer, 0, sizeof(buffer));
+	smplStatus_t rxStatus;
+	NWK_DELAY(500);
+	while (SMPL_SUCCESS == (rxStatus = SMPL_Receive(linkID, &buffer[0], &len)))
+	{
+		printf("rcv\n");
+		/* current version of transmitBitfield function sends the last N versions
+		 * of a bitfield with a length of 32bit */
+		memcpy(&(bf[idx++]), &buffer, sizeof(uint32_t));
+		NWK_DELAY(50);
+	}
+	printf("status:%d\n", rxStatus);
+		   
+	/* shut the radio down */
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+	
+	/* print the bitfields to the terminal */
+	printf("Collecting from Node %d:\n", node);
+	for (uint8_t i = 0; i < idx; i++)
+		printBitfield(&bf[i]);
+	
+	return true;
 }
 
 static void listenBitfield()
@@ -187,41 +309,49 @@ static void listenBitfield()
 }
 
 /* enables the receiver and waits for a sync message from the network or a button
- * press. If a button press is detected, the node will start it's own network 
- * Return: true - if sync message was received */
+ * press. If a button press is detected, the node will start collecting historic data
+ * Return: true - if sync message was received
+ *                 false - if button press was detected */
 static bool waitSync()
 {
 	uint8_t len = 0;
 	bool syncMessageReceived = false;
-	BSP_TURN_OFF_LED1();
+	BSP_TURN_ON_LED1();
 	
 	/* wake up radio. We need it to listen for broadcasts */
-    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
-    /* turn on RX. default is RX off. */
-    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
-
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
+	/* turn on RX. default is RX off. */
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
+	
 	/* enter a infinite loop, listening for a sync message from the Network.
-	 * When the message is received start the RTC to sync to the Nw and break 
-	 * the loop */
-    bool exitLoop = false;
+	* When the message is received start the RTC to sync to the Nw and break 
+	* the loop */
+	bool exitLoop = false;
 	while (!exitLoop) 
 	{
-		if (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, buffer, &len)) 
-		{
-			BSP_TURN_ON_LED1();
-			if (buffer[0] == msg_sync) {
-				/* sync message from network received -> start the algorithm */ 
-				syncMessageReceived = true;
-				exitLoop = true;
+			if (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, buffer, &len)) 
+			{
+					BSP_TURN_ON_LED1();
+					if (buffer[0] == msg_sync) {
+							/* sync message from network received -> start the algorithm */ 
+							syncMessageReceived = true;
+							exitLoop = true;
+					}
 			}
-		}
+			
+			/* check if the user pressed the "collect historic data" button */
+			if (exitLoop || BSP_BUTTON1()) 
+			{
+					break;
+			}
 	}
-	
 	/* shut the radio down */
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 	
+	BSP_TURN_OFF_LED1();
 	return syncMessageReceived;
 }
+
 
 /* prints the lowest 8 bits of the bitfield for demo purposes */
 static void printBitfield(uint32_t *bf)

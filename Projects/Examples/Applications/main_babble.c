@@ -45,13 +45,13 @@
 #include "string.h"
 
 /* unique ID for this network node, also used to decide the order of the algorithm steps */
-#define UNIQUE_ID 0x00
+#define UNIQUE_ID 0x02
 /* number of iterations of the (broadcast-listen) or (listen-broadcast) loop */
 #define BROADCAST_ITERATIONS 4
 /* radio active period during broadcast and listen step (in multiples of 10ms)*/
 #define RADIO_PERIOD 50
 /* sleep period between broadcasting cycles (in seconds) */
-#define SLEEP_PERIOD 10
+#define SLEEP_PERIOD 7
 /* set the number of bitfields to keep in memory */
 #define BITFIELD_MEMORY 10
 
@@ -79,6 +79,9 @@ static volatile uint32_t activePeriodOfLimit;
 static unsigned char st2 =0, st1=0, st0=0;
 static unsigned long countVal=0;
 static unsigned long offset = 0;
+/* global variables for the data collection support */
+static bool collectFlag = false;
+static bool transmitFlag = false;
 
 /* reserve memory space in XDATA memory locations, that contains data in sleep modes 2 and 3 
  * and is used to store the last n bitfields */
@@ -134,14 +137,15 @@ static void countingAlgorithm(bool joinNetwork)
 			broadcastSync();
 		joinNetwork = false;
 		
+		/* reset the bitfield because a new cycle starts */
+		bitfieldA = 0;
+		
 		/* start with listening / broadcasting depending on the unique id */
 		if (UNIQUE_ID % 2 == 0)
 		{
 			for (uint8_t i = 0; i < BROADCAST_ITERATIONS; i++)
 			{
-				BSP_TURN_ON_LED1();
 				broadcastBitfield();
-				BSP_TURN_OFF_LED1();
 				listenBitfield();
 			}
 		} 
@@ -149,19 +153,38 @@ static void countingAlgorithm(bool joinNetwork)
 		{
 			for (uint8_t i = 0; i < BROADCAST_ITERATIONS; i++) 
 			{
-				BSP_TURN_OFF_LED1();
 				listenBitfield();
-				BSP_TURN_ON_LED1();
 				broadcastBitfield();
 			}
 		}
 		
 		/* store the bitfield in a list in memory */
 		storeBitfield(&bitfieldA);
-					  
+		
+		/* if the network detected a collect request, insert a fixed period in all
+		 * nodes to keep the network in sync.
+		 * Todo: dynamically measure the time required for the transmission and 
+		 * deduct it from the sleep period */
+		if (collectFlag)
+		{
+			BSP_TURN_ON_LED1();
+			setActivePeriod(100);
+			while (activePeriod)
+			{
+				if (transmitFlag)
+				{
+					transmitBitfields();
+					transmitFlag = false;
+					BSP_TURN_OFF_LED1();
+				}
+			}
+			collectFlag = false;
+		}
+		
 		/* send SOC to sleep */
 		BSP_TURN_OFF_LED1();
-		sleepPm2(SLEEP_PERIOD);
+		//sleepPm2(SLEEP_PERIOD);
+		NWK_DELAY(7000);
 	}
 }
 
@@ -187,6 +210,7 @@ static void broadcastBitfield()
 		if (!bcast_sent)
 		{
 			SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer));
+			SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer));
 			bcast_sent = true;
 			/* shut the radio down early as possible to save energy */
 			SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
@@ -201,8 +225,6 @@ static void broadcastBitfield()
 
 static void listenBitfield()
 {
-	BSP_TURN_OFF_LED1();
-
 	uint32_t tmp_bitfield = 0;
 	uint8_t len = 0;
 	
@@ -215,20 +237,20 @@ static void listenBitfield()
 	setActivePeriod(RADIO_PERIOD);
     while(activePeriod)
 	{
-		/* we might have received multiple messages, iterate over the receive buffer
-		 * to make sure all messages are being processed */
-		while (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, buffer, &len)) 
+		if (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, buffer, &len)) 
 		{
 			if (buffer[0] == msg_count) {
 				tmp_bitfield = (uint32_t)*(&buffer[1]);
 				bitfieldA |= tmp_bitfield;
+				BSP_TOGGLE_LED1();
 			/* if a collect message is received, check if it's addressed to this 
 		     * network node. Transmit the stored bitfields if it is */
 			} else if (buffer[0] == msg_collect) {
+				collectFlag = true;
 				tmp_bitfield = (uint32_t)*(&buffer[1]);
 				uint32_t cmp_bitfield = (1 << UNIQUE_ID);
-				if (tmp_bitfield == cmp_bitfield)
-					transmitBitfields();
+				if (cmp_bitfield == tmp_bitfield) 
+					transmitFlag = true;
 			}
 		}
 	}
@@ -243,6 +265,7 @@ static void listenBitfield()
 		if (!radioShutDown) 
 		{
 			SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+			BSP_TURN_OFF_LED1();
 			radioShutDown = true;
 		}
 	}
@@ -256,7 +279,7 @@ static bool waitSync()
 {
 	uint8_t len = 0;
 	bool syncMessageReceived = false;
-	BSP_TURN_OFF_LED1();
+	BSP_TURN_ON_LED1();
 	
 	/* wake up radio. We need it to listen for broadcasts */
     SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
@@ -271,7 +294,6 @@ static bool waitSync()
 	{
 		if (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, buffer, &len)) 
 		{
-			BSP_TURN_ON_LED1();
 			if (buffer[0] == msg_sync) {
 				/* sync message from network received -> start the algorithm */ 
 				syncMessageReceived = true;
@@ -288,6 +310,7 @@ static bool waitSync()
 	
 	/* shut the radio down */
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+	BSP_TURN_OFF_LED1();
 	
 	return syncMessageReceived;
 }
@@ -334,20 +357,34 @@ void storeBitfield(const uint32_t *bitfield)
  * again */
 void transmitBitfields(void)
 {
+	/* wake up radio. */
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
+	/* turn on RX. default is RX off. */
+    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
+	
 	/* open up a link for the data-collection device, by default this function
 	 * waits for 5 seconds, use LINKLISTEN_MILLISECONDS_2_WAIT (nwk_api.c) to modify */
 	linkID_t linkID;
-	if (SMPL_TIMEOUT == SMPL_LinkListen(&linkID))
+	if (SMPL_TIMEOUT == SMPL_LinkListen(&linkID)) 
+	{
 		/* return early if no connection is established within the timelimit */
+		/* shut the radio down */
+		SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 		return;
-	
+	}
 	/* transmit all stored bitfields to the data-collection device */
 	for (uint8_t i = 0; i < bfIdx; i++)
 	{
-		if (SMPL_SUCCESS != SMPL_Send(linkID, (uint8_t*)&bitfieldMemory[i], sizeof(bitfieldMemory[0])))
+		if (SMPL_SUCCESS != SMPL_SendOpt(linkID, (uint8_t*)&bitfieldMemory[i], sizeof(bitfieldMemory[0]), SMPL_TXOPTION_ACKREQ))
+		{
 			/* transmission failed, end transmission */
 			break;
+		}
+		NWK_DELAY(45);
 	}
+	
+	/* shut the radio down */
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 }
 
 /* sets the board up to be able to use the sleep timer for waking up from power
