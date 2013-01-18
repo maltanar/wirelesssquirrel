@@ -43,6 +43,7 @@
 #include "nwk_pll.h"
 #include "stdio.h"
 #include "string.h"
+#include "stdlib.h"
 
 /* unique ID for this network node, also used to decide the order of the algorithm steps */
 #define UNIQUE_ID 0xFE
@@ -54,7 +55,7 @@
  * ! has to be 1-2 seconds shorter than for the broacasting nodes */
 #define SLEEP_PERIOD 6
 /* set the number of bitfields to keep in memory */
-#define BITFIELD_MEMORY 10
+#define BITFIELD_MEMORY 5
 
 /* the message type is used in the first byte of every message to define what kind
  * of data is carried by the message */
@@ -62,7 +63,8 @@ typedef enum msg_type
 {
 	msg_sync = 0x01,
 	msg_collect = 0x02,
-	msg_count = 0x04
+	msg_count = 0x04,
+	msg_stored_data = 0x08
 }msg_type;
 
 /* to be able to use bit operations we have to use integers to represent the bitfield.
@@ -94,6 +96,7 @@ __interrupt void timer1IR(void);
 static void gatherAlgorithm(void);
 static void collectAlgorithm(void);
 static bool collectFromNode(uint8_t node);
+static void sendCollectMessage(uint8_t node);
 static void listenBitfield(void);
 static bool waitSync(void);
 static void storeBitfield(const uint32_t *bitfield);
@@ -162,7 +165,6 @@ static void gatherAlgorithm()
 		
 		/* send SOC to sleep */
 		BSP_TURN_OFF_LED1();
-		//sleepPm2(SLEEP_PERIOD);
 	}
 }
 
@@ -189,9 +191,55 @@ static void collectAlgorithm()
 	printf("Finished\n");
 }
 
+/* sends a 'collect_message' to the requested node and listens for broadcasts from
+ * that node and prints them to the terminal */
+static bool collectFromNode(uint8_t node)
+{
+	/* allocate memory space to store the received bitfields temporarly */
+	uint32_t *bf = (uint32_t*)malloc(BITFIELD_MEMORY*sizeof(uint32_t));
+	
+	/* notify the target node of the collect request, send one request during
+	 * every active radio period, to make sure the request arrives, and the duration
+	 * matches on the different nodes */
+	for (uint8_t i = 0; i < BROADCAST_ITERATIONS*2; i++)
+		sendCollectMessage(node);
+	
+	/* wake up radio */
+    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
+	 /* turn on RX. default is RX off. */
+    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
+	
+	/* receive the stored bitfields */
+	uint8_t len, idx = 0;
+	memset(buffer, 0, sizeof(buffer));
+	
+	setActivePeriod(200);
+	while (activePeriod)
+	{
+		if (SMPL_SUCCESS == SMPL_Receive(SMPL_LINKID_USER_UUD, &buffer[0], &len))
+		{
+			/* current version of transmitBitfield function sends the last N versions
+			 * of a bitfield with a length of 32bit */
+			if (buffer[0] == msg_stored_data) {
+				bf[idx++] = (uint32_t)*(&buffer[1]);
+			}
+		}
+	}   
+	/* shut the radio down */
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+	
+	/* print the bitfields to the terminal */
+	printf("Collecting from Node %d:\n", node);
+	for (uint8_t i = 0; i < idx; i++)
+		printBitfield(&bf[i]);
+	
+	free(bf);
+	return true;
+}
+
 /* sends one collect message to the requested node, and blocks for duration of
  * RADIO_PERIOD */
-static void collectMessage(uint8_t node)
+static void sendCollectMessage(uint8_t node)
 {
 	/* define the bitfield that signals the target node a request */
 	uint32_t collectBf = 1 << node;
@@ -220,62 +268,6 @@ static void collectMessage(uint8_t node)
 	 * to keep duration of listenBitfield() and broadcastBitfield() equal */
 	setActivePeriod(1);
     while(activePeriod);
-}
-
-/* sends a 'collect_message' to the requested node and tries to establish a direct
- * link to the node. If the link can be established, the function collects stored
- * bitfields from the node and prints them to the terminal */
-static bool collectFromNode(uint8_t node)
-{
-	/* allocate memory space to store the received bitfields temporarly */
-	uint32_t bf[BITFIELD_MEMORY];
-	
-	/* notify the target node of the collect request, send one request during
-	 * every active radio period, to make sure the request arrives, and the duration
-	 * matches on the different nodes */
-	for (uint8_t i = 0; i < BROADCAST_ITERATIONS*2; i++)
-		collectMessage(node);
-	
-	/* wake up radio */
-    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
-	 /* turn on RX. default is RX off. */
-    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
-	
-	/* try to open up a link to the node */
-	linkID_t linkID;
-	BSP_TURN_ON_LED1();
-	if (SMPL_SUCCESS != SMPL_Link(&linkID)) 
-	{
-		BSP_TURN_OFF_LED1();
-		printf("No Link to %d\n", node);
-		/* return early if no connection is established within the timelimit */
-		SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
-		return false;
-	}
-	/* receive the stored bitfields */
-	uint8_t len, idx = 0;
-	memset(buffer, 0, sizeof(buffer));
-	smplStatus_t rxStatus;
-	NWK_DELAY(500);
-	while (SMPL_SUCCESS == (rxStatus = SMPL_Receive(linkID, &buffer[0], &len)))
-	{
-		printf("rcv\n");
-		/* current version of transmitBitfield function sends the last N versions
-		 * of a bitfield with a length of 32bit */
-		memcpy(&(bf[idx++]), &buffer, sizeof(uint32_t));
-		NWK_DELAY(50);
-	}
-	printf("status:%d\n", rxStatus);
-		   
-	/* shut the radio down */
-	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
-	
-	/* print the bitfields to the terminal */
-	printf("Collecting from Node %d:\n", node);
-	for (uint8_t i = 0; i < idx; i++)
-		printBitfield(&bf[i]);
-	
-	return true;
 }
 
 static void listenBitfield()
@@ -367,13 +359,16 @@ static void printBitfield(uint32_t *bf)
  * when the device enters sleep mode 2 or 3 */
 void storeBitfield(const uint32_t *bitfield)
 {
+	uint32_t tmpBf;
 	/* if the storage is full, shift the content by one and add the bitfield to 
 	 * the end of the list */
 	if (bfIdx >= BITFIELD_MEMORY) 
 	{
 		for (uint8_t i = 0; i < BITFIELD_MEMORY-1; i++)
 		{
-			bitfieldMemory[i] = bitfieldMemory[i+i];
+			tmpBf = bitfieldMemory[i+1];
+			bitfieldMemory[i] = 0;
+			bitfieldMemory[i] = tmpBf;
 		}
 		bitfieldMemory[bfIdx-1] = *bitfield;
 	} else
