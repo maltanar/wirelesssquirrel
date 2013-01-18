@@ -30,9 +30,11 @@ public class EnvironmentDisplay extends JFrame {
         m_sensorDisplayList = new HashMap<Integer, NodeDisplay>();
         m_environment = env;
         setSize(500,500);
+        //setSize(1024,720);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setTitle("Sensor Environment Display");
         setBackground(Color.WHITE);
+        this.setLayout(null);
     }
     
     public void checkForNewNodes()
@@ -92,7 +94,7 @@ public class EnvironmentDisplay extends JFrame {
     public void addSensor(SensorNode node) {
         NodeDisplay display = new NodeDisplay(node);
         //sensor.setLocation(node.getPosition().x, node.getPosition().y);
-        display.setSize(50, 30);
+        //display.setSize(50, 30);
 
         // Display the node id
         /*Integer sensorID = node.getNodeID();
