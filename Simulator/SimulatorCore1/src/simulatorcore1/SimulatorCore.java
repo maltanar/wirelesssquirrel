@@ -37,7 +37,7 @@ public class SimulatorCore
     {
         m_simulationItems.remove(name);
     }
-    
+   
     public void passTime(double ms)
     {
         // propagate simulation of passage of time to every simulated item

@@ -4,6 +4,7 @@
  */
 package simulatorcore1;
 
+import java.awt.Font;
 import java.awt.Point;
 import java.awt.event.MouseEvent;
 import javax.swing.JButton;
@@ -18,6 +19,8 @@ public class NodeDisplay extends JButton {
     private boolean pressed = false;
     private int oldX, oldY;
     private SensorNode m_node;
+    private final int width = 300;
+    private final int length = 50;
 
     public NodeDisplay(SensorNode attachedNode) {
         m_node = attachedNode;
@@ -31,7 +34,8 @@ public class NodeDisplay extends JButton {
         this.setText(newText);
         // synchronize position
         this.setLocation(m_node.getPosition().x, m_node.getPosition().y);
-        this.setSize(300, 50);
+        this.setSize(width, length);
+        
     }
 
     @Override
