@@ -85,7 +85,7 @@ public class PhysicalEnvironment implements SimulationItem, RadioInterface {
         double dx = p1.x - p2.x;
         double dy = p1.y - p2.y;
 
-        return (int) Math.sqrt(dx * dx + dy * dy);
+        return (int) Math.sqrt(dx * dx + dy * dy) *10;
     }
 
     // generate a random position within allowed size
