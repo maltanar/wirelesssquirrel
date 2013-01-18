@@ -108,7 +108,7 @@ public class EnvironmentDisplay extends JFrame {
         if (node.getNodeID() % 2 == 0) {
             display.setBackground(Color.RED);// Even node
         } else {
-            display.setBackground(Color.BLUE);// Odd node
+            display.setBackground(Color.YELLOW);// Odd node
         }
 
         display.setBorder(blackline);
