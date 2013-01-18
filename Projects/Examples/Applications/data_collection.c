@@ -49,10 +49,10 @@
 /* number of iterations of the listen-broadcast loop */
 #define BROADCAST_ITERATIONS 4
 /* radio active period during broadcast and listen step (in multiples of 10ms)*/
-#define RADIO_PERIOD 50
+#define RADIO_PERIOD 30
 /* sleep period between broadcasting cycles (in seconds)
  * ! has to be 1-2 seconds shorter than for the broacasting nodes */
-#define SLEEP_PERIOD 8
+#define SLEEP_PERIOD 6
 /* set the number of bitfields to keep in memory */
 #define BITFIELD_MEMORY 10
 
@@ -100,12 +100,17 @@ static void initSleepTimer(void);
 static void exitSleepTimer(void);
 static void sleepPm2(uint32_t seconds);
 static void printBitfield(uint32_t *bf);
+static void initUart(void);
+static void txUart(char);
 
 void main (void)
 {
 	/* initialize the board hardware */
 	BSP_Init();
 
+	/* Initialise the UART */
+	initUart();
+	
 	/* Assign a unique address to the radio device, based on the the unique NW id.
 	 * The first three bytes can be selected arbitrarlily */
 	addr_t lAddr = {{0x71, 0x56, 0x34, UNIQUE_ID}};
@@ -139,7 +144,6 @@ static void gatherAlgorithm()
 			listenBitfield();
 		}
 		
-	
 		/* print the result of the gather operation */
 		printBitfield(&bitfieldA);
 		
@@ -154,8 +158,6 @@ static void gatherAlgorithm()
 
 static void listenBitfield()
 {
-	BSP_TURN_OFF_LED1();
-
 	uint32_t tmp_bitfield = 0;
 	uint8_t len = 0;
 	
@@ -181,6 +183,7 @@ static void listenBitfield()
 	}
 	/* shut down the radio */
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+	BSP_TURN_OFF_LED1();
 }
 
 /* enables the receiver and waits for a sync message from the network or a button
@@ -220,8 +223,14 @@ static bool waitSync()
 	return syncMessageReceived;
 }
 
+/* prints the lowest 8 bits of the bitfield for demo purposes */
 static void printBitfield(uint32_t *bf)
 {
+	for (uint8_t i = 0; i < 8; i++)
+	{
+		printf("%c", (*bf & (1 << i))? '1' : '0');
+	}
+	printf("\n");
 }
 
 /* function to store the current bitfield in a memory location that's not lost
@@ -352,6 +361,31 @@ static void sleepPm2(uint32_t seconds)
 		IRCON = ircon_prev;
 		IEN0 = ien_prev;
 	}
+}
+
+/* Initialise parameters for Uart transmission */
+void initUart()
+{
+	// Set Baud rate to 9600bps
+	U0BAUD = 0x59;
+	U0GCR |= 0x08;
+	
+	// Set UART mode and disable receiver
+	U0CSR = (U0CSR | 0x80) & ~0x40;
+	
+	// Select correct I/O pins. Use alternative 1 from datasheet 13.4.6.4
+	PERCFG &= ~0xFE;
+	P0SEL = 0x3C; 
+		
+}
+
+void txUart(char testByte)
+{
+	// Load bitfield into tx register
+	U0DBUF = testByte;
+	
+	// Wait while byte is transmitted
+	while(U0CSR & 0x01);
 }
 
 /* function for setting the global "activePeriod" variable to true after n * 100 ms have passed */
