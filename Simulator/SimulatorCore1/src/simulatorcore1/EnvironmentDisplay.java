@@ -103,13 +103,7 @@ public class EnvironmentDisplay extends JFrame {
 
         sensor.setText(displayData);*/
 
-        if (node.getNodeID() % 2 == 0) {
-            display.setBackground(Color.RED);// Even node
-        } else {
-            display.setBackground(Color.YELLOW);// Odd node
-        }
-
-        //display.setBorder(blackline);
+        display.setBorder(blackline);
         m_sensorDisplayList.put(node.getNodeID(), display);
         
         this.add(display);

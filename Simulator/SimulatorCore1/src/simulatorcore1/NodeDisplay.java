@@ -4,6 +4,7 @@
  */
 package simulatorcore1;
 
+import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Point;
@@ -21,8 +22,8 @@ public class NodeDisplay extends JPanel implements MouseInputListener {
     private boolean pressed = false;
     private int oldX, oldY;
     private SensorNode m_node;
-    private final int width = 300;
-    private final int length = 50;
+    private final int width = 100;
+    private final int height = 30;
     private String m_text;
 
     public NodeDisplay(SensorNode attachedNode) {
@@ -34,12 +35,10 @@ public class NodeDisplay extends JPanel implements MouseInputListener {
 
     public void updateData() {
         // update content of GUI element from simulated SensorNode
-        String newText = "ID: " + m_node.getNodeID();
-        newText += " Flags: " + m_node.getPresenceData().toString();
-        m_text = newText;
+        m_text = m_node.getPresenceData().toString();
         // synchronize position
         this.setLocation(m_node.getPosition().x, m_node.getPosition().y);
-        this.setSize(width, length);
+        this.setSize(width, height);
         repaint();
     }
 
@@ -47,8 +46,19 @@ public class NodeDisplay extends JPanel implements MouseInputListener {
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
 
-        // Draw Text
-        g.drawString(m_text, 10, 20);
+        g.drawString(m_text, 15, 20);
+        
+        if(m_node.getNodeID() % 2 == 0)
+            g.setColor(Color.yellow);
+        else
+            g.setColor(Color.red);
+
+        g.fillOval(0, 0, 15, 15);
+        
+        // Draw ID
+        g.setColor(Color.black);
+        g.drawString(Integer.toString(m_node.getNodeID()), 5, 13);
+        
     }
 
     @Override
