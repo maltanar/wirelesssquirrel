@@ -9,18 +9,28 @@ package simulatorcore1;
  * @author maltanar
  */
 public class ControlPanel extends javax.swing.JFrame {
+
     private SimulatorCore m_simulator;
     private PhysicalEnvironment m_environment;
     private EnvironmentDisplay m_display;
+
     /**
      * Creates new form ControlPanel
      */
     public ControlPanel(SimulatorCore simulator, PhysicalEnvironment env,
-                         EnvironmentDisplay display) {
+            EnvironmentDisplay display) {
         m_simulator = simulator;
         m_environment = env;
         m_display = display;
         initComponents();
+        updateStatusLabel();
+    }
+
+    protected void updateStatusLabel() {
+        String statusText = "Status (current/max nodes): ";
+        statusText += Integer.toString(m_environment.getNodeCount()) + "/";
+        statusText += Integer.toString(m_environment.getMaxNetworkSize());
+        statusLabel.setText(statusText);
     }
 
     /**
@@ -36,9 +46,7 @@ public class ControlPanel extends javax.swing.JFrame {
         createNodeCount = new javax.swing.JTextField();
         jLabel1 = new javax.swing.JLabel();
         createNodeBtn = new javax.swing.JButton();
-        jLabel2 = new javax.swing.JLabel();
-        maxAllowedNodeCnt = new javax.swing.JTextField();
-        setMaxAllowedNodeBtn = new javax.swing.JButton();
+        statusLabel = new javax.swing.JLabel();
         jPanel1 = new javax.swing.JPanel();
         jButton1 = new javax.swing.JButton();
         jButton2 = new javax.swing.JButton();
@@ -62,7 +70,7 @@ public class ControlPanel extends javax.swing.JFrame {
             }
         });
 
-        jLabel1.setText("Count:");
+        jLabel1.setText("Add:");
 
         createNodeBtn.setText("Create");
         createNodeBtn.addActionListener(new java.awt.event.ActionListener() {
@@ -71,16 +79,7 @@ public class ControlPanel extends javax.swing.JFrame {
             }
         });
 
-        jLabel2.setText("Max Allowed:");
-
-        maxAllowedNodeCnt.setText("5");
-        maxAllowedNodeCnt.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                maxAllowedNodeCntActionPerformed(evt);
-            }
-        });
-
-        setMaxAllowedNodeBtn.setText("Set");
+        statusLabel.setText("Status: 0 current / 0 max allowed");
 
         javax.swing.GroupLayout nodeControlLayout = new javax.swing.GroupLayout(nodeControl);
         nodeControl.setLayout(nodeControlLayout);
@@ -96,21 +95,15 @@ public class ControlPanel extends javax.swing.JFrame {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addComponent(createNodeBtn))
                     .addGroup(nodeControlLayout.createSequentialGroup()
-                        .addComponent(jLabel2)
-                        .addGap(18, 18, 18)
-                        .addComponent(maxAllowedNodeCnt)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(setMaxAllowedNodeBtn)))
+                        .addComponent(statusLabel)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
                 .addContainerGap())
         );
         nodeControlLayout.setVerticalGroup(
             nodeControlLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, nodeControlLayout.createSequentialGroup()
-                .addGap(20, 20, 20)
-                .addGroup(nodeControlLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jLabel2)
-                    .addComponent(maxAllowedNodeCnt, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(setMaxAllowedNodeBtn))
+                .addGap(26, 26, 26)
+                .addComponent(statusLabel)
                 .addGap(18, 18, 18)
                 .addGroup(nodeControlLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel1)
@@ -118,8 +111,6 @@ public class ControlPanel extends javax.swing.JFrame {
                     .addComponent(createNodeBtn))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
-
-        setMaxAllowedNodeBtn.getAccessibleContext().setAccessibleParent(null);
 
         jPanel1.setBorder(javax.swing.BorderFactory.createTitledBorder("Node Display"));
 
@@ -187,9 +178,9 @@ public class ControlPanel extends javax.swing.JFrame {
         jPanel2Layout.setHorizontalGroup(
             jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel2Layout.createSequentialGroup()
+                .addContainerGap()
                 .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(jPanel2Layout.createSequentialGroup()
-                        .addContainerGap()
                         .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jLabel3)
                             .addComponent(jLabel4))
@@ -198,14 +189,11 @@ public class ControlPanel extends javax.swing.JFrame {
                             .addComponent(stepCount)
                             .addComponent(timestepSize)))
                     .addGroup(jPanel2Layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addComponent(jButton4)
-                        .addGap(0, 60, Short.MAX_VALUE)))
+                        .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jButton4)
+                            .addComponent(jButton3, javax.swing.GroupLayout.PREFERRED_SIZE, 226, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
-            .addGroup(jPanel2Layout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jButton3, javax.swing.GroupLayout.PREFERRED_SIZE, 226, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         jPanel2Layout.setVerticalGroup(
             jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -235,7 +223,7 @@ public class ControlPanel extends javax.swing.JFrame {
                     .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(nodeControl, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(jPanel2, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap(24, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -246,7 +234,7 @@ public class ControlPanel extends javax.swing.JFrame {
                 .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(17, Short.MAX_VALUE))
+                .addContainerGap(21, Short.MAX_VALUE))
         );
 
         pack();
@@ -256,22 +244,18 @@ public class ControlPanel extends javax.swing.JFrame {
         // TODO add your handling code here:
     }//GEN-LAST:event_createNodeCountActionPerformed
 
-    private void maxAllowedNodeCntActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_maxAllowedNodeCntActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_maxAllowedNodeCntActionPerformed
-
     private void createNodeBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_createNodeBtnActionPerformed
-        
+
         int newNodeCount = Integer.parseInt(createNodeCount.getText());
         SensorNode newNode;
         NodeDisplay newNodeDisplay;
-        for(int i = 0; i < newNodeCount; i++)
-        {
+        for (int i = 0; i < newNodeCount; i++) {
             newNode = m_environment.createNode();
-            m_simulator.addSimulationItem(Integer.toString(newNode.getNodeID()), 
-                                          newNode);
+            m_simulator.addSimulationItem(Integer.toString(newNode.getNodeID()),
+                    newNode);
             m_display.checkForNewNodes();
         }
+        updateStatusLabel();
     }//GEN-LAST:event_createNodeBtnActionPerformed
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
@@ -280,22 +264,23 @@ public class ControlPanel extends javax.swing.JFrame {
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
         m_display.checkForNewNodes();
+        updateStatusLabel();
     }//GEN-LAST:event_jButton2ActionPerformed
 
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
         int steps = Integer.parseInt(stepCount.getText());
         double length = Double.parseDouble(timestepSize.getText());
         System.out.printf("Simulating %d steps of %f ms \n", steps, length);
-        for(int i = 0; i < steps; i++) {
+        for (int i = 0; i < steps; i++) {
             m_simulator.passTime(length);
             m_display.updateAll();
         }
+        updateStatusLabel();
     }//GEN-LAST:event_jButton3ActionPerformed
 
     private void jButton4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton4ActionPerformed
         m_environment.makeSyncBroadcast();
     }//GEN-LAST:event_jButton4ActionPerformed
-
     // Variables declaration - do not modify//GEN-BEGIN:variables
     public javax.swing.JButton createNodeBtn;
     private javax.swing.JTextField createNodeCount;
@@ -304,14 +289,12 @@ public class ControlPanel extends javax.swing.JFrame {
     private javax.swing.JButton jButton3;
     private javax.swing.JButton jButton4;
     private javax.swing.JLabel jLabel1;
-    private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
-    private javax.swing.JTextField maxAllowedNodeCnt;
     private javax.swing.JPanel nodeControl;
-    public javax.swing.JButton setMaxAllowedNodeBtn;
+    private javax.swing.JLabel statusLabel;
     private javax.swing.JTextField stepCount;
     private javax.swing.JTextField timestepSize;
     // End of variables declaration//GEN-END:variables
