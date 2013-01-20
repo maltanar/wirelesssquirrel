@@ -259,7 +259,10 @@ public class ControlPanel extends javax.swing.JFrame {
     }//GEN-LAST:event_createNodeBtnActionPerformed
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
-        // TODO add your handling code here:
+        m_display.removeAllSensors();
+        m_simulator.removeAllItems();
+        m_environment.removeAllNodes();
+        updateStatusLabel();
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed

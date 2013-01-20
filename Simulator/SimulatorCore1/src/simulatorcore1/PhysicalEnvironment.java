@@ -58,6 +58,10 @@ public class PhysicalEnvironment implements SimulationItem, RadioInterface {
 
         return newNode;
     }
+    
+    public void removeAllNodes() {
+        m_sensorNodes.clear();
+    }
 
     public SensorConfig getSensorConfig() {
         return m_sensorConfig;
@@ -136,7 +140,7 @@ public class PhysicalEnvironment implements SimulationItem, RadioInterface {
     @Override
     public void propagateRadioWaves(String message, SensorNode origin,
             double txPower) {
-        // TODO use precomputed node distance table here
+        // TODO could use precomputed node distance table here
         Iterator<SensorNode> nodes = m_sensorNodes.values().iterator();
         int distance = 0;
         double rxPower = 0;

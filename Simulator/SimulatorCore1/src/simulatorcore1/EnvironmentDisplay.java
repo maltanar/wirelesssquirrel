@@ -116,4 +116,15 @@ public class EnvironmentDisplay extends JFrame {
         
         this.repaint();
     }
+    
+    public void removeAllSensors()
+    {
+        Iterator<NodeDisplay> itr = m_sensorDisplayList.values().iterator();
+        
+        while(itr.hasNext())
+            this.remove(itr.next());
+        
+        m_sensorDisplayList.clear();
+        this.repaint();
+    }
 }
