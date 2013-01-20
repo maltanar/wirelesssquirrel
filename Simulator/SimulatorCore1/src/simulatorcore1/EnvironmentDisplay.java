@@ -29,9 +29,7 @@ public class EnvironmentDisplay extends JFrame {
     public EnvironmentDisplay(PhysicalEnvironment env) {
         m_sensorDisplayList = new HashMap<Integer, NodeDisplay>();
         m_environment = env;
-        setSize(500,500);
-        //setSize(1024,720);
-        setExtendedState(JFrame.MAXIMIZED_BOTH);
+        setSize(env.getWidth(), env.getHeight());
         setTitle("Sensor Environment Display");
         setBackground(Color.WHITE);
         this.setLayout(null);

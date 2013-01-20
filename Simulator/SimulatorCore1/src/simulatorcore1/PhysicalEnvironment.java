@@ -31,6 +31,14 @@ public class PhysicalEnvironment implements SimulationItem, RadioInterface {
         m_sensorConfig.txPowerdBm = -0.4;
         m_sensorConfig.rxSensitivitydBm = -92;
     }
+    
+    public int getWidth() {
+        return m_width;
+    }
+    
+    public int getHeight() {
+        return m_height;
+    }
 
     public SensorNode createNode() {
         if (getNodeCount() >= m_maxNetworkSize) {
