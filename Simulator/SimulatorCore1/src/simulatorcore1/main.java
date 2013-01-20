@@ -5,6 +5,7 @@
 package simulatorcore1;
 
 import java.util.Scanner;
+import javax.swing.JFrame;
 
 /**
  *
@@ -25,7 +26,9 @@ public class main {
         SimulatorCore simulator = new SimulatorCore();
         
         EnvironmentDisplay dp = new EnvironmentDisplay(environment);
-        dp.setVisible(true);
+        JFrame container = new JFrame("Environment Display");
+        container.setContentPane(dp);
+        container.setVisible(true);
         
         ControlPanel cp = new ControlPanel(simulator, environment, dp);
         cp.setVisible(true);

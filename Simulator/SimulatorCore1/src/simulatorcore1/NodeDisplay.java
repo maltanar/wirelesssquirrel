@@ -67,9 +67,9 @@ public class NodeDisplay extends JPanel implements MouseInputListener {
 
     @Override
     public void mousePressed(MouseEvent e) {
-        System.out.println("pressed");
         oldX = e.getXOnScreen();
         oldY = e.getYOnScreen();
+        ((EnvironmentDisplay)this.getParent()).encircle(this);
     }
 
     @Override
@@ -79,6 +79,7 @@ public class NodeDisplay extends JPanel implements MouseInputListener {
         newPosition.x = this.getLocation().x;
         newPosition.y = this.getLocation().y;
         m_node.setPosition(newPosition);
+        ((EnvironmentDisplay)this.getParent()).encircle(null);
     }
 
     @Override
@@ -91,7 +92,6 @@ public class NodeDisplay extends JPanel implements MouseInputListener {
 
     @Override
     public void mouseDragged(MouseEvent e) {
-        System.out.println("dragged");
         Point currentLocation = this.getLocation();
 
         currentLocation.translate(e.getXOnScreen() - oldX,
@@ -101,6 +101,8 @@ public class NodeDisplay extends JPanel implements MouseInputListener {
 
         oldX = e.getXOnScreen();
         oldY = e.getYOnScreen();
+        
+        ((EnvironmentDisplay)this.getParent()).encircle(this);
     }
 
     @Override
