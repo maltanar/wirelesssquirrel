@@ -1301,6 +1301,7 @@
           <state>xMRFI_CC2430</state>
           <state>MCU_H=&lt;ioCC2431.h></state>
           <state>MRFI_CC2431</state>
+          <state>EXTENDED_API</state>
         </option>
         <option>
           <name>CCPreprocFile</name>
@@ -1711,7 +1712,7 @@
         </option>
         <option>
           <name>OutputFile</name>
-          <state>Cascading_End_Devices.d51</state>
+          <state>WiSq_Collection_Node.d51</state>
         </option>
         <option>
           <name>OutputFormat</name>

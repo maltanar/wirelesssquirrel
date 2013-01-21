@@ -50,6 +50,8 @@
 #define BROADCAST_ITERATIONS 4
 /* radio active period during broadcast and listen step (in multiples of 10ms)*/
 #define RADIO_PERIOD 50
+/* radio active period during data collection cycle (in multiples of 10ms) */
+#define COLLECT_PERIOD 200
 /* sleep period between broadcasting cycles (in seconds) */
 #define SLEEP_PERIOD 7
 /* set the number of bitfields to keep in memory */
@@ -168,7 +170,7 @@ static void countingAlgorithm(bool joinNetwork)
 		if (collectFlag)
 		{
 			BSP_TURN_ON_LED1();
-			setActivePeriod(100);
+			setActivePeriod(COLLECT_PERIOD);
 			while (activePeriod)
 			{
 				if (transmitFlag)
@@ -336,13 +338,16 @@ static void broadcastSync()
  * when the device enters sleep mode 2 or 3 */
 void storeBitfield(const uint32_t *bitfield)
 {
+	uint32_t tmpBf;
 	/* if the storage is full, shift the content by one and add the bitfield to 
 	 * the end of the list */
 	if (bfIdx >= BITFIELD_MEMORY) 
 	{
 		for (uint8_t i = 0; i < BITFIELD_MEMORY-1; i++)
 		{
-			bitfieldMemory[i] = bitfieldMemory[i+i];
+			tmpBf = bitfieldMemory[i+1];
+			bitfieldMemory[i] = 0;
+			bitfieldMemory[i] = tmpBf;
 		}
 		bitfieldMemory[bfIdx-1] = *bitfield;
 	} else
@@ -365,6 +370,7 @@ void transmitBitfields(void)
 	/* open up a link for the data-collection device, by default this function
 	 * waits for 5 seconds, use LINKLISTEN_MILLISECONDS_2_WAIT (nwk_api.c) to modify */
 	linkID_t linkID;
+	BSP_TURN_ON_LED1();
 	if (SMPL_TIMEOUT == SMPL_LinkListen(&linkID)) 
 	{
 		/* return early if no connection is established within the timelimit */
@@ -372,16 +378,13 @@ void transmitBitfields(void)
 		SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 		return;
 	}
+	BSP_TURN_OFF_LED1();
 	/* transmit all stored bitfields to the data-collection device */
 	for (uint8_t i = 0; i < bfIdx; i++)
 	{
-		if (SMPL_SUCCESS != SMPL_SendOpt(linkID, (uint8_t*)&bitfieldMemory[i], sizeof(bitfieldMemory[0]), SMPL_TXOPTION_ACKREQ))
-		{
-			/* transmission failed, end transmission */
-			break;
-		}
-		NWK_DELAY(45);
+		SMPL_Send(linkID, (uint8_t*)&bitfieldMemory[i], sizeof(bitfieldMemory[0]));
 	}
+	SMPL_Unlink(linkID);
 	
 	/* shut the radio down */
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
