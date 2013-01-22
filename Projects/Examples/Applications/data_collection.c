@@ -97,6 +97,7 @@ static void gatherAlgorithm(void);
 static void collectAlgorithm(void);
 static bool collectFromNode(uint8_t node);
 static void sendCollectMessage(uint8_t node);
+static bool establishLink(linkID_t *linkID);
 static void listenBitfield(void);
 static bool waitSync(void);
 static void storeBitfield(const uint32_t *bitfield);
@@ -118,7 +119,7 @@ void main (void)
 	
 	/* Assign a unique address to the radio device, based on the the unique NW id.
 	 * The first three bytes can be selected arbitrarlily */
-	addr_t lAddr = {{0x71, 0x56, 0x34, UNIQUE_ID}};
+	addr_t lAddr = {{UNIQUE_ID, 0xAB, 0xBC, 0xCD}};
 	SMPL_Ioctl(IOCTL_OBJ_ADDR, IOCTL_ACT_SET, &lAddr);
 	
 	/* This call will fail because the join will fail since there is no Access Point
@@ -163,9 +164,7 @@ static void gatherAlgorithm()
 			collectAlgorithm();
 		}
 		
-		/* send SOC to sleep */
 		BSP_TURN_OFF_LED1();
-		//sleepPm2(SLEEP_PERIOD);
 	}
 }
 
@@ -204,7 +203,7 @@ static void printBitfield(uint32_t *bf)
 {
 	for (uint8_t i = 0; i < 8; i++)
 	{
-		printf("%c", (*bf & (1 << i))? '1' : '0');
+		printf("%c", (*bf & (1 << (7-i)))? '1' : '0');
 	}
 	printf("\n");
 }
@@ -240,15 +239,18 @@ static void collectAlgorithm()
 		/* ignore button pushed and wait for sync message */
 		if (waitSync())
 		{	
-			for (uint8_t i = 0; i < 8; i++)
-			{
-				if (bitfieldA & (1 << i)) {
-					collectFromNode(i);
-					/* mark the node as processed */
-					bitfieldA &= ~(1 << i);
-					break;
-				}
-			}
+			collectFromNode(2);
+			bitfieldA = 0;
+//			
+//			for (uint8_t i = 0; i < 8; i++)
+//			{
+//				if (bitfieldA & (1 << i)) {
+//					collectFromNode(i);
+//					/* mark the node as processed */
+//					bitfieldA &= ~(1 << i);
+//					break;
+//				}
+//			}
 		}
 	}
 	printf("Finished\n");
@@ -273,24 +275,14 @@ static bool collectFromNode(uint8_t node)
 	 /* turn on RX. default is RX off. */
     SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
 	
-	/* make multiple attempts to open up a link to the node */
+	/* try to establish a link to the node */
 	linkID_t linkID;
-	smplStatus_t linkStatus;
-	BSP_TURN_ON_LED1();
-	for (uint8_t i = 0; i < 8 ; i++)
+	if (!establishLink(&linkID)) 
 	{
-		if (SMPL_SUCCESS == (linkStatus = SMPL_Link(&linkID))) 
-			break;
-	}
-			
-	if (linkStatus != SMPL_SUCCESS) 
-		{
-			printf("No Link to %d\n", node);
-			/* return early if no connection is established within the timelimit */
+			/* shut the radio down */
 			SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 			return false;
-		}
-	BSP_TURN_OFF_LED1();
+	}
 	
 	/* receive the stored bitfields */
 	uint8_t len, idx = 0;
@@ -307,7 +299,6 @@ static bool collectFromNode(uint8_t node)
 			memcpy(&(bf[idx++]), &buffer, sizeof(uint32_t));
 		}
 	}	
-	
 	/* shut the radio down */
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 	
@@ -316,6 +307,28 @@ static bool collectFromNode(uint8_t node)
 	for (uint8_t i = 0; i < idx; i++)
 		printBitfield(&bf[i]);
 	
+	return true;
+}
+
+/* make multiple attempts to open up a link to a node
+ * IN/OUT: linkID - link ID of the new connection 
+ * Returns: true if link could be established */
+static bool establishLink(linkID_t *linkID)
+{
+	smplStatus_t linkStatus;
+	BSP_TURN_ON_LED1();
+	for (uint8_t i = 0; i < 8 ; i++)
+	{
+		if (SMPL_SUCCESS == (linkStatus = SMPL_Link(linkID))) 
+			break;
+	}
+			
+	if (linkStatus != SMPL_SUCCESS) 
+		{
+			printf("No Link to node");
+			return false;
+		}
+	BSP_TURN_OFF_LED1();
 	return true;
 }
 
@@ -340,6 +353,8 @@ static void sendCollectMessage(uint8_t node)
 	{
 		if (!bcast_sent) 
 		{
+			SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer));
+			SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer));
 			SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer));
 			bcast_sent = true;
 			/* shut the radio down early as possible to save energy */
