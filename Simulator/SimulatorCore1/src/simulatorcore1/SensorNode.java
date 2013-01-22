@@ -308,6 +308,11 @@ public class SensorNode implements SimulationItem {
                         newTime = 0;
                     }
                 }
+                
+                // rx and tx need to be enabled before next sim cycle
+                // otherwise we may drop messages
+                m_isRxActive = !isMyTurnToSend();
+                m_isTxActive = isMyTurnToSend();
 
                 // when we have gone through the tx-rx cycles the desired num
                 // of times, go back to sleep   
