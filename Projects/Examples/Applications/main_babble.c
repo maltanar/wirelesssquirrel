@@ -45,11 +45,13 @@
 #include "string.h"
 
 /* unique ID for this network node, also used to decide the order of the algorithm steps */
-#define UNIQUE_ID 0x05
+#define UNIQUE_ID 0x04
 /* number of iterations of the (broadcast-listen) or (listen-broadcast) loop */
 #define BROADCAST_ITERATIONS 4
 /* radio active period during broadcast and listen step (in multiples of 10ms)*/
 #define RADIO_PERIOD 50
+/* radio active period during data collection cycle (in multiples of 10ms) */
+#define COLLECT_PERIOD 200
 /* sleep period between broadcasting cycles (in seconds) */
 #define SLEEP_PERIOD 7
 /* set the number of bitfields to keep in memory */
@@ -61,8 +63,7 @@ typedef enum msg_type
 {
 	msg_sync = 0x01,
 	msg_collect = 0x02,
-	msg_count = 0x04,
-	msg_stored_data = 0x08
+	msg_count = 0x04
 }msg_type;
 
 /* to be able to use bit operations we have to use integers to represent the bitfield.
@@ -80,9 +81,8 @@ static volatile uint32_t activePeriodOfLimit;
 static unsigned char st2 =0, st1=0, st0=0;
 static unsigned long countVal=0;
 static unsigned long offset = 0;
-/* global variables for the data collection support */
+/* global variable for the data collection support */
 static bool collectFlag = false;
-static bool transmitFlag = false;
 
 /* reserve memory space in XDATA memory locations, that contains data in sleep modes 2 and 3 
  * and is used to store the last n bitfields */
@@ -113,7 +113,7 @@ void main (void)
 
 	/* Assign a unique address to the radio device, based on the the unique NW id.
 	 * The first three bytes can be selected arbitrarlily */
-	addr_t lAddr = {{0x71, 0x56, 0x34, UNIQUE_ID}};
+	addr_t lAddr = {{UNIQUE_ID, 0xAB, 0xBC, 0xCD}};
 	SMPL_Ioctl(IOCTL_OBJ_ADDR, IOCTL_ACT_SET, &lAddr);
 	
 	/* This call will fail because the join will fail since there is no Access Point
@@ -162,29 +162,25 @@ static void countingAlgorithm(bool joinNetwork)
 		/* store the bitfield in a list in memory */
 		storeBitfield(&bitfieldA);
 		
-		/* if the network detected a collect request, insert a fixed period in all
-		 * nodes to keep the network in sync.
-		 * Todo: dynamically measure the time required for the transmission and 
-		 * deduct it from the sleep period */
+		/* if the network node detected a collect request, transmit the data at
+		 * the end of the cycle, and re-join the network afterwards, so that the 
+		 * synchronization is not affected by data-collection operations */
 		if (collectFlag)
 		{
 			BSP_TURN_ON_LED1();
-			setActivePeriod(200);
-			while (activePeriod)
-			{
-				if (transmitFlag)
-				{
-					transmitBitfields();
-					transmitFlag = false;
-					BSP_TURN_OFF_LED1();
-				}
-			}
+			transmitBitfields();
+			joinNetwork = true;
 			collectFlag = false;
-		}
-		
-		/* send SOC to sleep */
-		BSP_TURN_OFF_LED1();
-		sleepPm2(SLEEP_PERIOD);
+			/* send SOC to sleep (for a shortened perdiod of time) and re-join the network */
+			BSP_TURN_OFF_LED1();
+			sleepPm2(SLEEP_PERIOD - 2);
+			waitSync();
+		} else
+		{
+			/* send SOC to sleep */
+			BSP_TURN_OFF_LED1();
+			sleepPm2(SLEEP_PERIOD);
+		}		
 	}
 }
 
@@ -192,6 +188,7 @@ static void broadcastBitfield()
 {
 	/* wake up radio. */
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
 	
 	/* set the own bit in the bitfield */
 	bitfieldA |= 1 << UNIQUE_ID;
@@ -201,7 +198,7 @@ static void broadcastBitfield()
 	buffer[0] = msg_count;
 	memcpy(&buffer[1], &bitfieldA, sizeof(bitfieldA));
 	
-	/* broadcast the current bitfield one single time, then shutdown the radio
+	/* broadcast the current bitfield 4 times, then shutdown the radio
 	 * and wait for the transmit period to expire */
 	bool bcast_sent = false;
 	setActivePeriod(RADIO_PERIOD);
@@ -209,10 +206,11 @@ static void broadcastBitfield()
 	{
 		if (!bcast_sent)
 		{
-			SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer));
-			SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer));
+			for (uint8_t i = 0; i <= 4; i++)
+				SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(buffer));
 			bcast_sent = true;
 			/* shut the radio down early as possible to save energy */
+			SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXIDLE, 0);
 			SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 		}
 	}
@@ -244,13 +242,12 @@ static void listenBitfield()
 				bitfieldA |= tmp_bitfield;
 				BSP_TOGGLE_LED1();
 			/* if a collect message is received, check if it's addressed to this 
-		     * network node. Transmit the stored bitfields if it is */
+		     * network node, and schedule the transmission of stored data */
 			} else if (buffer[0] == msg_collect) {
-				collectFlag = true;
 				tmp_bitfield = (uint32_t)*(&buffer[1]);
 				uint32_t cmp_bitfield = (1 << UNIQUE_ID);
 				if (cmp_bitfield == tmp_bitfield) 
-					transmitFlag = true;
+					collectFlag = true;
 			}
 		}
 	}
@@ -264,6 +261,7 @@ static void listenBitfield()
 		/* shut the radio down */
 		if (!radioShutDown) 
 		{
+			SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXIDLE, 0);
 			SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 			BSP_TURN_OFF_LED1();
 			radioShutDown = true;
@@ -309,6 +307,7 @@ static bool waitSync()
 	}
 	
 	/* shut the radio down */
+	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXIDLE, 0);
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
 	BSP_TURN_OFF_LED1();
 	
@@ -362,22 +361,27 @@ void transmitBitfields(void)
 {
 	/* wake up radio. */
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_AWAKE, 0);
+	/* turn on RX. default is RX off. */
+    SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_RXON, 0);
 	
+	/* open up a link for the data-collection device, by default this function
+	 * waits for 5 seconds, use LINKLISTEN_MILLISECONDS_2_WAIT (nwk_api.c) to modify */
+	linkID_t linkID;
+	BSP_TURN_ON_LED1();
+	if (SMPL_TIMEOUT == SMPL_LinkListen(&linkID)) 
+	{
+		/* return early if no connection is established within the timelimit */
+		/* shut the radio down */
+		SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);
+		return;
+	}
+	BSP_TURN_OFF_LED1();
 	/* transmit all stored bitfields to the data-collection device */
 	for (uint8_t i = 0; i < bfIdx; i++)
 	{
-		/* copy the current bitfield into the transmit buffer */
-		memset(buffer, 0, sizeof(buffer));
-		buffer[0] = msg_stored_data;
-		memcpy(&buffer[1], &bitfieldMemory[i], sizeof(bitfieldMemory[0]));
-		
-		if (SMPL_SUCCESS != SMPL_Send(SMPL_LINKID_USER_UUD, buffer, sizeof(bitfieldMemory[0])))
-		{
-			/* transmission failed, end transmission */
-			break;
-		}
-		NWK_DELAY(40);
+		SMPL_Send(linkID, (uint8_t*)&bitfieldMemory[i], sizeof(bitfieldMemory[0]));
 	}
+	SMPL_Unlink(linkID);
 	
 	/* shut the radio down */
 	SMPL_Ioctl( IOCTL_OBJ_RADIO, IOCTL_ACT_RADIO_SLEEP, 0);

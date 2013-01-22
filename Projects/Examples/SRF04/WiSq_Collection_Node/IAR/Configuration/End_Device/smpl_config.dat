@@ -46,7 +46,7 @@
  * clients because the forwarded messages are held here. Two is probably enough
  * for an End Device
  */
--DSIZE_INFRAME_Q=2
+-DSIZE_INFRAME_Q=6
 
 /* The output frame queue can be small since Tx is done synchronously. Actually
  * 1 is probably enough. If an Access Point device is also hosting an End Device 

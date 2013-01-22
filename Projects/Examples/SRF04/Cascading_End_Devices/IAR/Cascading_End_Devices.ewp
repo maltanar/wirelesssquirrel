@@ -1183,7 +1183,7 @@
         </option>
         <option>
           <name>RTLibraryPath</name>
-          <state>$TOOLKIT_DIR$\LIB\CLIB\cl-e2i-2lxd-1e16x01.r51</state>
+          <state>$TOOLKIT_DIR$\LIB\CLIB\cl-pli-nlxd-1e16x01.r51</state>
         </option>
         <option>
           <name>Input variant</name>
@@ -1301,6 +1301,7 @@
           <state>xMRFI_CC2430</state>
           <state>MCU_H=&lt;ioCC2431.h></state>
           <state>MRFI_CC2431</state>
+          <state>EXTENDED_API</state>
         </option>
         <option>
           <name>CCPreprocFile</name>
@@ -1777,7 +1778,7 @@
         </option>
         <option>
           <name>XclFile</name>
-          <state>$TOOLKIT_DIR$\config\devices\Texas Instruments\lnk51ew_CC2431F128_banked_ext2.xcl</state>
+          <state>$TOOLKIT_DIR$\config\devices\Texas Instruments\lnk51ew_CC2431F128.xcl</state>
         </option>
         <option>
           <name>XclFileSlave</name>
@@ -3150,7 +3151,7 @@
         <name>$PROJ_DIR$\..\..\..\..\..\Components\simpliciti\nwk_applications\nwk_ioctl.c</name>
       </file>
       <file>
-        <name>$PROJ_DIR$\..\..\..\..\..\Components\simpliciti\nwk_applications\nwk_ioctl.h</name>
+        <name>$PROJ_DIR$\..\..\..\..\..\Components\SimpliciTI\nwk_applications\nwk_ioctl.h</name>
       </file>
       <file>
         <name>$PROJ_DIR$\..\..\..\..\..\Components\simpliciti\nwk_applications\nwk_join.c</name>
