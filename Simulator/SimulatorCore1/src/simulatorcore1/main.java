@@ -28,6 +28,7 @@ public class main {
         EnvironmentDisplay dp = new EnvironmentDisplay(environment);
         JFrame container = new JFrame("Environment Display");
         container.setContentPane(dp);
+        container.setSize(dp.getWidth(), dp.getHeight());
         container.setVisible(true);
         
         ControlPanel cp = new ControlPanel(simulator, environment, dp);

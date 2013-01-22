@@ -82,22 +82,22 @@ public class PhysicalEnvironment implements SimulationItem, RadioInterface {
     }
 
     // calculate the distance given two node IDs
-    public int calculateDistance(Integer nodeID1, Integer nodeID2) {
+    public double calculateDistance(Integer nodeID1, Integer nodeID2) {
         return calculateDistance(getNode(nodeID1), getNode(nodeID2));
     }
 
     // calculate the distance given two nodes
-    public int calculateDistance(SensorNode n1, SensorNode n2) {
+    public double calculateDistance(SensorNode n1, SensorNode n2) {
         return calculateDistance(n1.getPosition(), n2.getPosition());
     }
 
     // calculate the distance given two positions
-    public int calculateDistance(SensorPosition p1, SensorPosition p2) {
+    public double calculateDistance(SensorPosition p1, SensorPosition p2) {
         // we have a simple Cartesian distance formula for the moment
-        double dx = p1.x - p2.x;
-        double dy = p1.y - p2.y;
+        double dx = Math.abs(p1.x - p2.x);
+        double dy = Math.abs(p1.y - p2.y);
 
-        return (int) Math.sqrt(dx * dx + dy * dy) *100;
+        return Math.sqrt((dx * dx) + (dy * dy));
     }
 
     // generate a random position within allowed size
@@ -142,10 +142,10 @@ public class PhysicalEnvironment implements SimulationItem, RadioInterface {
             double txPower) {
         // TODO could use precomputed node distance table here
         Iterator<SensorNode> nodes = m_sensorNodes.values().iterator();
-        int distance = 0;
+        double distance = 0;
         double rxPower = 0;
         // wavelength = speed of light / 2.4 GHz
-        double wavelength = (3 * 10 ^ 8 / (2445 * 10 ^ 6));
+        double wavelength = (300.0 / 2445.0);   // 3*10^8 / 2445 * 10^6
 
         while (nodes.hasNext()) {
             SensorNode node = nodes.next();
@@ -158,10 +158,30 @@ public class PhysicalEnvironment implements SimulationItem, RadioInterface {
                 // antenna gains assumed to be 0 dB
                 rxPower = txPower + 20 * Math.log10(wavelength
                         / (4 * Math.PI * distance));
+                System.out.printf("Distance btw %d and %d is %f, rxp %f \n",
+                                origin.getNodeID(), node.getNodeID(),
+                                distance, rxPower);
                 // expose target node to radio waves
                 node.receiveRadioWaves(message, rxPower);
             }
         }
+    }
+    
+    public double getMaxRange(double Pt, double Pr) {
+        double wavelength = (300.0 / 2445.0);   // 3*10^8 / 2445 * 10^6
+        // calculate max transmission range given tx power and rx sensitivity
+        // using the Friis equation
+        // zero-dBm antenna gains assumed
+        double max_range = wavelength / (4.0 * Math.PI * 
+                            Math.pow(10, (Pr - Pt) / 20.0));
+        
+        return max_range;
+    }
+    
+    public double getMaxRange()
+    {
+        return getMaxRange(m_sensorConfig.txPowerdBm, 
+                           m_sensorConfig.rxSensitivitydBm);
     }
 
     @Override

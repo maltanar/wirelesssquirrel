@@ -138,10 +138,13 @@ public class EnvironmentDisplay extends JPanel {
 
         //  draw circle indicating range around selected node
         // TODO fix size and position
+        int maxRange = (int) m_environment.getMaxRange();
+        System.out.printf("Max range: %d \n", maxRange);
 
         if (m_circleCoords.x != 0 && m_circleCoords.y != 0) {
             g.setColor(Color.red);
-            g.drawOval(m_circleCoords.x, m_circleCoords.y, 100, 100);
+            g.drawOval(m_circleCoords.x - maxRange, m_circleCoords.y - maxRange, 
+                       2*maxRange, 2*maxRange);
         }
 
         //g.drawString("testing testing", 20, 20);
