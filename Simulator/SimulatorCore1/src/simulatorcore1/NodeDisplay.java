@@ -59,6 +59,13 @@ public class NodeDisplay extends JPanel implements MouseInputListener {
         g.setColor(Color.black);
         g.drawString(Integer.toString(m_node.getNodeID()), 5, 13);
         
+        if(m_node.getRxActive())
+            g.drawString("Rx", 80, 20);
+        else if(m_node.getTxActive())
+            g.drawString("Tx", 80, 20);
+        else
+            g.drawString("Zz", 80, 20);
+        
     }
 
     @Override
