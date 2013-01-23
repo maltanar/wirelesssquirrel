@@ -14,7 +14,7 @@ import javax.swing.JFrame;
 public class main {
     public static void main(String[] args) 
     {
-        // enter the number of sensor to be simulated 
+        // enter the max network size to be simulated 
         System.out.println("Please enter the max number of nodes to be simulated: ");
         System.out.println("note: only integer valid");
         

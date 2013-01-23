@@ -69,6 +69,13 @@ public class PhysicalEnvironment implements SimulationItem, RadioInterface {
 
     public void setSensorConfig(SensorConfig m_sensorConfig) {
         this.m_sensorConfig = m_sensorConfig;
+        
+        // propagate config change to all sensors
+        Iterator<SensorNode> nodes = m_sensorNodes.values().iterator();
+
+        while (nodes.hasNext()) {
+            nodes.next().setNodeConfig(m_sensorConfig);
+        }
     }
 
     // return number of present nodes in the environment
