@@ -1,4 +1,18 @@
 /*----------------------------------------------------------------------------
+ *  Wireless presence detection - Data Collection
+ * 
+ *  The intention of this project is to create a functional proof-of-concept for 
+ *  energy efficient presence detection, with the Chipcon/Texas Instruments CC2431 
+ *  as the implementation platform and using the SimpliciTI framework. 
+ *  Made as part of the Wireless Networks course at the University of Southampton.
+ *
+ *  More information on the project can be found at
+ *  http://code.google.com/p/wirelesssquirrel/
+ *
+ *  This program was initially based on the Cascading End Devices example program
+ *  by Texas Instruments
+ *---------------------------------------------------------------------------- */
+/*----------------------------------------------------------------------------
  *  Demo Application for SimpliciTI
  * 
  *  L. Friedman
